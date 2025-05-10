@@ -1,5 +1,150 @@
 
 
-pub fn init_tui()->(){
-    println!("Hello from tui");
+use crossterm::{
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
+    execute,
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+};
+use ratatui::{
+    prelude::*,
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+};
+use std::{io, time::Duration, error::Error};
+
+// For now, App will be simple. We'll expand it later.
+struct App {
+    // We can add things like a list of servers, selected server index, logs, etc.
+    // For now, just a counter to show something dynamic.
+    counter: i32,
+    // Placeholder for server logs
+    logs: Vec<String>,
+}
+
+impl App {
+    fn new() -> App {
+        App {
+            counter: 0,
+            logs: vec!["Log panel initialized.".to_string()],
+        }
+    }
+
+    fn on_tick(&mut self) {
+        self.counter += 1;
+        // Example: Add a new log entry periodically or when a server sends output
+        // self.logs.push(format!("Tick: {}", self.counter));
+        // Keep logs manageable
+        if self.logs.len() > 20 {
+            self.logs.remove(0);
+        }
+    }
+}
+
+pub fn init_tui() -> Result<(), Box<dyn Error>> {
+    // Setup terminal
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    // Create app and run it
+    let mut app = App::new();
+    let res = run_app(&mut terminal, &mut app);
+
+    // Restore terminal
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(err) = res {
+        println!("Error running TUI: {:?}", err);
+        return Err(Box::new(err));
+    }
+
+    Ok(())
+}
+
+fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+    loop {
+        terminal.draw(|f| ui::<B>(f, app))?;
+
+        // Event handling with a timeout. 20fps
+        if event::poll(Duration::from_millis(50))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
+                        KeyCode::Char('j') | KeyCode::Down => {
+                            // Placeholder for moving down in server list
+                            app.logs.push("Select Down".to_string());
+                        }
+                        KeyCode::Char('k') | KeyCode::Up => {
+                            // Placeholder for moving up in server list
+                            app.logs.push("Select Up".to_string());
+                        }
+                        KeyCode::Enter => {
+                            // Placeholder for launching/modifying server
+                            app.logs.push("Pressed Enter".to_string());
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        // Simple tick for now
+        app.on_tick();
+    }
+}
+
+fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
+    // Main vertical layout: one for app content, one for controls
+    let main_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Min(0),       // Main content area takes the rest of the space
+            Constraint::Length(3),    // Controls panel: 1 line for text, 2 for borders
+        ].as_ref())
+        .split(f.size());
+
+    let content_area_chunk = main_chunks[0];
+    let controls_chunk = main_chunks[1];
+
+    // Horizontal layout for the content area (servers and logs)
+    let content_chunks = Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
+        .split(content_area_chunk); // Split the top part
+
+    // Left Panel: Server List
+    let left_panel_content = Paragraph::new(format!(
+        "Server List\n\n{} Server 1\n{} Server 2\n{} Server 3\n\nCounter: {}",
+        format!("○").red(),
+        format!("○").red(),
+        format!("○").red(),
+        app.counter
+    ))
+    .block(Block::default().title("Servers").borders(Borders::ALL).border_style(Style::new().light_blue()))
+    .wrap(Wrap { trim: true });
+    f.render_widget(left_panel_content, content_chunks[0]);
+
+    // Right Panel: Log Output
+    let log_text: Vec<Line> = app.logs.iter().map(|log| Line::from(log.as_str())).collect();
+    let right_panel_content = Paragraph::new(log_text)
+        .block(Block::default().title("Log Stream").borders(Borders::ALL))
+        .wrap(Wrap { trim: true });
+    f.render_widget(right_panel_content, content_chunks[1]);
+
+    // Bottom Panel: Controls
+    let controls_spans = Line::from(vec![
+        Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
+        Span::raw("J/K = Navigate | Enter = Select/Launch | Q = Quit"),
+    ]);
+    let controls_panel = Paragraph::new(controls_spans)
+        .block(Block::default().title("Controls").borders(Borders::ALL))
+        .alignment(Alignment::Center);
+    f.render_widget(controls_panel, controls_chunk);
 }
