@@ -11,6 +11,8 @@ use ratatui::{
 };
 use std::{io, time::Duration, error::Error};
 
+use crate::db::Server;
+
 // For now, App will be simple. We'll expand it later.
 struct App {
     // We can add things like a list of servers, selected server index, logs, etc.
@@ -18,6 +20,8 @@ struct App {
     counter: i32,
     // Placeholder for server logs
     logs: Vec<String>,
+    available_servers :Vec<Server>,
+    selected_server: usize,
 }
 
 impl App {
@@ -25,8 +29,20 @@ impl App {
         App {
             counter: 0,
             logs: vec!["Log panel initialized.".to_string()],
+            available_servers: vec![
+                Server {
+                    id: 1,
+                    name: "Server 1".to_string(),
+                    path: "/C".to_string(),
+                    executable: "server.jar".to_string(),
+                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    autostart: false
+                }
+            ],
+            selected_server: 0,
         }
     }
+
 
     fn on_tick(&mut self) {
         self.counter += 1;
@@ -81,14 +97,17 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         KeyCode::Char('j') | KeyCode::Down => {
                             // Placeholder for moving down in server list
                             app.logs.push("Select Down".to_string());
+                            app.selected_server = wrap_index(app.selected_server - 1 , 0, app.available_servers.len() as usize - 1);
                         }
                         KeyCode::Char('k') | KeyCode::Up => {
                             // Placeholder for moving up in server list
                             app.logs.push("Select Up".to_string());
+                            app.selected_server = wrap_index(app.selected_server + 1 , 0, app.available_servers.len() as usize - 1);
                         }
                         KeyCode::Enter => {
                             // Placeholder for launching/modifying server
                             app.logs.push("Pressed Enter".to_string());
+                            app.logs.push(format!("Launching server: {}", app.available_servers[app.selected_server].name));
                         }
                         _ => {}
                     }
@@ -147,4 +166,10 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
         .block(Block::default().title("Controls").borders(Borders::ALL))
         .alignment(Alignment::Center);
     f.render_widget(controls_panel, controls_chunk);
+}
+
+
+fn wrap_index(value: usize, min: usize, max: usize) -> usize {
+    let range = max - min + 1;
+    ((value.wrapping_sub(min)) % range) + min
 }
