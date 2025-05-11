@@ -62,6 +62,30 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false
+                },
+                Server {
+                    id: 4,
+                    name: "Server 4".to_string(),
+                    path: "/C".to_string(),
+                    executable: "server.jar".to_string(),
+                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    autostart: false
+                },
+                Server {
+                    id: 5,
+                    name: "Server 5".to_string(),
+                    path: "/C".to_string(),
+                    executable: "server.jar".to_string(),
+                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    autostart: false
+                },
+                Server {
+                    id: 6,
+                    name: "Minecraft Server".to_string(),
+                    path: "/C".to_string(),
+                    executable: "server.jar".to_string(),
+                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    autostart: false
                 }
             ],
             selected_server: 0,
@@ -117,7 +141,6 @@ impl App {
 }
 
 pub fn init_tui() -> Result<(), Box<dyn Error>> {
-    // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
 
@@ -125,11 +148,9 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
 
-    // Create app and run it
     let mut app = App::new();
     let res = run_app(&mut terminal, &mut app);
 
-    // Restore terminal
     disable_raw_mode()?;
     execute!(
         terminal.backend_mut(),
@@ -212,19 +233,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 
         }
 
-        // Check for new log messages
         while let Ok(log_message) = app.log_receiver.try_recv() {
             app.logs.push(log_message);
         }
 
-        // Check for server lifecycle events
         while let Ok(event) = app.server_event_receiver.try_recv() {
             match event {
                 ServerLifecycleEvent::Exited { name } => {
                     app.logs.push(format!("Server {} signalled exit.", name));
                     if let Some(handle) = app.allocated_servers.get_mut(&name) {
-                        handle.running = false; // Mark as not running
-                                                // The on_tick logic will handle removal from allocated_servers
+                        handle.running = false;
                     }
                 }
             }
