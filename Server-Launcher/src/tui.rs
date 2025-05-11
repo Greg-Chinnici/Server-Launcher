@@ -6,15 +6,17 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*, style::{palette::material::ORANGE, Modifier, Style}, terminal, widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
+    prelude::*, style::{palette::material::ORANGE, Modifier, Style}, terminal,
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
 };
-use std::{io, time::Duration, error::Error};
-
+use std::io;
+use std::time::Duration;
 use std::collections::HashMap;
 use crate::servers;
+use std::error::Error;
 
 use crate::{db::Server, servers::ServerHandle};
-use std::sync::mpsc::{Sender, channel};
+use std::sync::mpsc::{Sender, Receiver, channel};
 
 struct App {
     counter: i32,
@@ -22,13 +24,14 @@ struct App {
     logs: Vec<String>,
     available_servers :Vec<Server>,
     selected_server: usize,
-    terminal_height: usize,
     allocated_servers: HashMap<String, ServerHandle>,
     log_sender: Sender<String>,
+    log_receiver: Receiver<String>,
 }
 
 impl App {
     fn new() -> App {
+        let (log_sender, log_receiver) = channel();
         App {
             counter: 0,
             logs: vec!["Log panel initialized.".to_string()],
@@ -60,19 +63,9 @@ impl App {
             ],
             selected_server: 0,
             // TODO make this change when resize and drive the length of log vec
-            terminal_height: 40,
             allocated_servers: HashMap::new(),
-            log_sender: {
-                let (sender, receiver) = channel();
-                // Spawn a thread to handle log messages
-                std::thread::spawn(move || {
-                    while let Ok(log) = receiver.recv() {
-                        // Handle log messages here
-                        println!("Log: {}", log);
-                    }
-                });
-                sender
-            }
+            log_sender,
+            log_receiver,
         }
     }
 
@@ -81,10 +74,7 @@ impl App {
         self.counter += 1;
         // Example: Add a new log entry periodically or when a server sends output
         // self.logs.push(format!("Tick: {}", self.counter));
-        // Keep logs manageable
-        if self.logs.len() > self.terminal_height - 5 {
-            self.logs.remove(0);
-        }
+        // Keep logs manageable - This is now handled in run_app
     }
 }
 
@@ -120,7 +110,11 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
 
 fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
     loop {
-        terminal.draw(|f| ui::<B>(f, app))?;
+        let mut log_panel_frame_rect = Rect::default(); // To store the log panel's frame Rect
+
+        terminal.draw(|f| {
+            log_panel_frame_rect = ui::<B>(f, app); // ui now returns the log panel's frame Rect
+        })?;
 
         // Event handling with a timeout. 20fps
         if event::poll(Duration::from_millis(50))? {
@@ -130,19 +124,16 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
                         KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Down => {
                             // Placeholder for moving down in server list
-                            app.logs.push("Select Down".to_string());
                             app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, 1);
                         }
                         KeyCode::Char('k') | KeyCode::Char('K') | KeyCode::Up => {
                             // Placeholder for moving up in server list
-                            app.logs.push("Select Up".to_string());
                             app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  -1);
                         }
                         KeyCode::Enter => {
                             // Placeholder for launching/modifying server
-                            app.logs.push("Pressed Enter".to_string());
                             app.logs.push(format!("Selected server: {}", app.available_servers[app.selected_server].name));
-                            
+
                             match servers::launch(&app.available_servers[app.selected_server] , app.log_sender.clone())
                             {
                                 Ok(handle) => {
@@ -175,13 +166,24 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             }
 
         }
+        // Check for new log messages
+        while let Ok(log_message) = app.log_receiver.try_recv() {
+            app.logs.push(log_message);
+        }
+
+        // Trim logs to fit the panel, ensuring we keep the latest entries
+        let displayable_log_lines = log_panel_frame_rect.height.saturating_sub(2).max(0) as usize; // -2 for borders, ensure non-negative
+        if app.logs.len() > displayable_log_lines {
+            app.logs.drain(0..(app.logs.len() - displayable_log_lines));
+        }
+
         // Simple tick for now
         app.on_tick();
 
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
+fn ui<B: Backend>(f: &mut Frame<>, app: &App) -> Rect { // Return the Rect of the log panel frame
     // Main vertical layout: one for app content, one for controls
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -225,11 +227,23 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
         f.render_widget(server_list, content_chunks[0]);
 
     // Right Panel: Log Output
+    let log_panel_frame_rect = content_chunks[1]; // The Rect for the entire log panel widget (frame included)
+
     let log_text: Vec<Line> = app.logs.iter().map(|log| Line::from(log.as_str())).collect();
+
+    // Calculate the inner height of the log panel for scrolling content (area inside borders)
+    let inner_log_area_height = log_panel_frame_rect.height.saturating_sub(2).max(0); // Subtract 2 for top/bottom borders
+
+    // Calculate scroll offset to show the latest logs.
+    // If app.logs.len() is less than or equal to inner_log_area_height, scroll_offset_y will be 0.
+    // Otherwise, it scrolls to ensure the last `inner_log_area_height` lines are visible at the bottom.
+    let scroll_offset_y = (app.logs.len() as u16).saturating_sub(inner_log_area_height);
+
     let right_panel_content = Paragraph::new(log_text)
         .block(Block::default().title("Log Stream").borders(Borders::ALL).border_style(Style::new().fg(Color::Rgb(255, 165, 0)))) // orange
-        .wrap(Wrap { trim: true });
-    f.render_widget(right_panel_content, content_chunks[1]);
+        .wrap(Wrap { trim: true })
+        .scroll((scroll_offset_y, 0)); // Add scroll to show the bottom of the logs
+    f.render_widget(right_panel_content, log_panel_frame_rect);
 
     // Bottom Panel: Controls
     let controls_spans = Line::from(vec![
@@ -241,6 +255,7 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
         .alignment(Alignment::Center);
     f.render_widget(controls_panel, controls_chunk);
 
+    content_chunks[1] // Return the Rect of the log panel's frame
 }
 
 
