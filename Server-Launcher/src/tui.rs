@@ -1,22 +1,18 @@
 
 
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
-    execute,
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
+    execute, queue,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*,
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap},
+    prelude::*, style::palette::material::ORANGE, widgets::{Block, BorderType, Borders, Paragraph, Wrap}
 };
 use std::{io, time::Duration, error::Error};
 
 use crate::db::Server;
 
-// For now, App will be simple. We'll expand it later.
 struct App {
-    // We can add things like a list of servers, selected server index, logs, etc.
-    // For now, just a counter to show something dynamic.
     counter: i32,
     // Placeholder for server logs
     logs: Vec<String>,
@@ -59,6 +55,7 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
+    
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -72,7 +69,7 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
     execute!(
         terminal.backend_mut(),
         LeaveAlternateScreen,
-        DisableMouseCapture
+        DisableMouseCapture,
     )?;
     terminal.show_cursor()?;
 
@@ -93,26 +90,42 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
                     match key.code {
-                        KeyCode::Char('q') | KeyCode::Esc => return Ok(()),
-                        KeyCode::Char('j') | KeyCode::Down => {
+                        KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
+                        KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Down => {
                             // Placeholder for moving down in server list
                             app.logs.push("Select Down".to_string());
-                            app.selected_server = wrap_index(app.selected_server - 1 , 0, app.available_servers.len() as usize - 1);
+                            app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, -1);
                         }
-                        KeyCode::Char('k') | KeyCode::Up => {
+                        KeyCode::Char('k') | KeyCode::Char('K') | KeyCode::Up => {
                             // Placeholder for moving up in server list
                             app.logs.push("Select Up".to_string());
-                            app.selected_server = wrap_index(app.selected_server + 1 , 0, app.available_servers.len() as usize - 1);
+                            app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  1);
                         }
                         KeyCode::Enter => {
                             // Placeholder for launching/modifying server
                             app.logs.push("Pressed Enter".to_string());
-                            app.logs.push(format!("Launching server: {}", app.available_servers[app.selected_server].name));
+                            app.logs.push(format!("Selected server: {}", app.available_servers[app.selected_server].name));
+                        }
+                        KeyCode::Char('x') |  KeyCode::Char('X') => {
+                            // Placeholder for killing/modifying server
+                            app.logs.push("Pressed X".to_string());
+                            app.logs.push(format!("Killing server: {}", app.available_servers[app.selected_server].name));
                         }
                         _ => {}
                     }
                 }
+                if key.kind == KeyEventKind::Repeat {
+                    match key.code {
+                        KeyCode::Enter => {
+                                // Placeholder for launching/modifying server
+                                app.logs.push("Pressed Enter as a Repeat".to_string());
+                                app.logs.push(format!("Launching server: {}", app.available_servers[app.selected_server].name));
+                            }
+                        _ => {}
+                    }
+                }
             }
+            
         }
         // Simple tick for now
         app.on_tick();
@@ -153,14 +166,14 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
     // Right Panel: Log Output
     let log_text: Vec<Line> = app.logs.iter().map(|log| Line::from(log.as_str())).collect();
     let right_panel_content = Paragraph::new(log_text)
-        .block(Block::default().title("Log Stream").borders(Borders::ALL))
+        .block(Block::default().title("Log Stream").borders(Borders::ALL).border_style(Style::new().fg(Color::Rgb(255, 165, 0)))) // orange
         .wrap(Wrap { trim: true });
     f.render_widget(right_panel_content, content_chunks[1]);
 
     // Bottom Panel: Controls
     let controls_spans = Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("J/K = Navigate | Enter = Select/Launch | Q = Quit"),
+        Span::raw("(J or ↑) / (K or ↓) = Navigate | Enter = Select/Launch | Q = Quit"),
     ]);
     let controls_panel = Paragraph::new(controls_spans)
         .block(Block::default().title("Controls").borders(Borders::ALL))
@@ -169,7 +182,10 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
 }
 
 
-fn wrap_index(value: usize, min: usize, max: usize) -> usize {
-    let range = max - min + 1;
-    ((value.wrapping_sub(min)) % range) + min
+fn wrap_index(index: usize, max_index: usize, delta: isize) -> usize {
+    (if delta.is_negative() {
+        index.wrapping_sub(delta.unsigned_abs())
+    } else {
+        index.wrapping_add(delta as usize)
+    }) % (max_index + 1)
 }
