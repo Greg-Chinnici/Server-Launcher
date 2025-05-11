@@ -33,6 +33,22 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false
+                },
+                Server {
+                    id: 2,
+                    name: "Server 2".to_string(),
+                    path: "/C".to_string(),
+                    executable: "server.jar".to_string(),
+                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    autostart: false
+                },
+                Server {
+                    id: 3,
+                    name: "Server 3".to_string(),
+                    path: "/C".to_string(),
+                    executable: "server.jar".to_string(),
+                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    autostart: false
                 }
             ],
             selected_server: 0,
@@ -55,7 +71,7 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
-    
+
     execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
     let backend = CrosstermBackend::new(stdout);
     let mut terminal = Terminal::new(backend)?;
@@ -95,11 +111,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             // Placeholder for moving down in server list
                             app.logs.push("Select Down".to_string());
                             app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, -1);
+                            app.logs.push(format!("new index is {}" , app.selected_server));
                         }
                         KeyCode::Char('k') | KeyCode::Char('K') | KeyCode::Up => {
                             // Placeholder for moving up in server list
                             app.logs.push("Select Up".to_string());
                             app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  1);
+                            app.logs.push(format!("new index is {}" , app.selected_server));
                         }
                         KeyCode::Enter => {
                             // Placeholder for launching/modifying server
@@ -125,7 +143,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     }
                 }
             }
-            
+
         }
         // Simple tick for now
         app.on_tick();
@@ -154,9 +172,9 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
     // Left Panel: Server List
     let left_panel_content = Paragraph::new(format!(
         "Server List\n\n{} Server 1\n{} Server 2\n{} Server 3\n\nCounter: {}",
-        format!("○").red(),
-        format!("○").red(),
-        format!("○").red(),
+        format!("○"),
+        format!("○"),
+        format!("○"),
         app.counter
     ))
     .block(Block::default().title("Servers").borders(Borders::ALL).border_style(Style::new().light_blue()))
@@ -183,9 +201,10 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
 
 
 fn wrap_index(index: usize, max_index: usize, delta: isize) -> usize {
-    (if delta.is_negative() {
-        index.wrapping_sub(delta.unsigned_abs())
-    } else {
-        index.wrapping_add(delta as usize)
-    }) % (max_index + 1)
+    let len = max_index + 1;
+    let current_idx_signed = index as isize;
+    let len_signed = len as isize;
+    let new_idx_signed = current_idx_signed + delta;
+    let result_signed = new_idx_signed.rem_euclid(len_signed);
+    result_signed as usize
 }
