@@ -16,7 +16,7 @@ use std::error::Error;
 use std::sync::mpsc::{Sender, Receiver, channel};
 
 use crate::{db::Server, servers::ServerHandle};
-use crate::servers;
+use crate::servers::{self, ServerLifecycleEvent}; // Import ServerLifecycleEvent
 
 struct App {
     counter: i32,
@@ -27,11 +27,14 @@ struct App {
     allocated_servers: HashMap<String, ServerHandle>,
     log_sender: Sender<String>,
     log_receiver: Receiver<String>,
+    server_event_sender: Sender<ServerLifecycleEvent>,
+    server_event_receiver: Receiver<ServerLifecycleEvent>,
 }
 
 impl App {
     fn new() -> App {
         let (log_sender, log_receiver) = channel();
+        let (server_event_sender, server_event_receiver) = channel(); // Create server event channel
         App {
             counter: 0,
             logs: vec!["Log panel initialized.".to_string()],
@@ -66,15 +69,50 @@ impl App {
             allocated_servers: HashMap::new(),
             log_sender,
             log_receiver,
+            server_event_sender,
+            server_event_receiver,
         }
     }
 
 
     fn on_tick(&mut self) {
         self.counter += 1;
-        // Example: Add a new log entry periodically or when a server sends output
-        // self.logs.push(format!("Tick: {}", self.counter));
-        // Keep logs manageable - This is now handled in run_app
+
+        let mut server_names_to_remove = Vec::new();
+
+        for (name, handle) in self.allocated_servers.iter_mut() {
+            if handle.running { // Only check/update servers that are supposed to be running
+                if let Some(ref mut child) = handle.child {
+                    match child.try_wait() {
+                        Ok(Some(_status)) => { // Process has exited
+                            self.logs.push(format!("Server {} process has exited.", name));
+                            handle.running = false; // Mark as not running
+                        }
+                        Ok(None) => { /* Process is still running */ }
+                        Err(e) => {
+                            self.logs.push(format!("Error checking status for server {}: {}. Marking as not running.", name, e));
+                            handle.running = false; // Mark as not running on error
+                        }
+                    }
+                } else {
+                    // For servers without a child process (e.g., dummy servers),
+                    // their `running` flag is primarily managed by lifecycle events
+                    // (like Exited) or explicit `kill_process` calls.
+                    // `try_wait` is not applicable here.
+                }
+            }
+
+            // If, after checks or an explicit kill, the handle is marked as not running, schedule for removal.
+            if !handle.running {
+                server_names_to_remove.push(name.clone());
+            }
+        }
+
+        for name in server_names_to_remove {
+            if self.allocated_servers.remove(&name).is_some() {
+                self.logs.push(format!("Server {} removed from allocated map.", name));
+            }
+        }
     }
 }
 
@@ -131,10 +169,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  -1);
                         }
                         KeyCode::Enter => {
-                            // Placeholder for launching/modifying server
-                            app.logs.push(format!("Selected server: {}", app.available_servers[app.selected_server].name));
+                            if (app.allocated_servers.contains_key(&app.available_servers[app.selected_server].name)){
+                                continue;
+                            }
 
-                            match servers::launch(&app.available_servers[app.selected_server] , app.log_sender.clone() , true)
+                            match servers::launch(&app.available_servers[app.selected_server], app.log_sender.clone(), app.server_event_sender.clone() , true)
                             {
                                 Ok(handle) => {
                                     app.allocated_servers.insert(app.available_servers[app.selected_server].name.clone(), handle);
@@ -146,8 +185,22 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             }
                         }
                         KeyCode::Char('x') |  KeyCode::Char('X') => {
-                            // Placeholder for killing/modifying server
-                            app.logs.push(format!("Killing server: {}", app.available_servers[app.selected_server].name));
+                            if !app.available_servers.is_empty() {
+                                let server_name_to_kill = app.available_servers[app.selected_server].name.clone();
+                                if let Some(handle) = app.allocated_servers.get_mut(&server_name_to_kill) {
+                                    match handle.kill_process() {
+                                        Ok(_) => {
+                                            app.logs.push(format!("Attempting to kill server: {}. It will be removed from the list if successful.", server_name_to_kill));
+                                            // The on_tick logic will now pick up that `handle.running` is false and remove it.
+                                        }
+                                        Err(e) => {
+                                            app.logs.push(format!("Failed to kill server {}: {}", server_name_to_kill, e));
+                                        }
+                                    }
+                                } else {
+                                    app.logs.push(format!("Server {} is not currently running or allocated.", server_name_to_kill));
+                                }
+                            }
                         }
                         KeyCode::Char('c') |  KeyCode::Char('C') => {
                             app.logs.clear();
@@ -155,31 +208,34 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         _ => {}
                     }
                 }
-                if key.kind == KeyEventKind::Repeat {
-                    match key.code {
-                        KeyCode::Enter => {
-                                // Placeholder for launching/modifying server
-                                app.logs.push("Pressed Enter as a Repeat".to_string());
-                                app.logs.push(format!("Launching server: {}", app.available_servers[app.selected_server].name));
-                            }
-                        _ => {}
-                    }
-                }
             }
 
         }
+
         // Check for new log messages
         while let Ok(log_message) = app.log_receiver.try_recv() {
             app.logs.push(log_message);
         }
 
+        // Check for server lifecycle events
+        while let Ok(event) = app.server_event_receiver.try_recv() {
+            match event {
+                ServerLifecycleEvent::Exited { name } => {
+                    app.logs.push(format!("Server {} signalled exit.", name));
+                    if let Some(handle) = app.allocated_servers.get_mut(&name) {
+                        handle.running = false; // Mark as not running
+                                                // The on_tick logic will handle removal from allocated_servers
+                    }
+                }
+            }
+        }
+
         // Trim logs to fit the panel, ensuring we keep the latest entries
-        let displayable_log_lines = log_panel_frame_rect.height.saturating_sub(2).max(0) as usize; // -2 for borders, ensure non-negative
+        let displayable_log_lines = log_panel_frame_rect.height.saturating_sub(2).max(0) as usize;
         if app.logs.len() > displayable_log_lines {
             app.logs.drain(0..(app.logs.len() - displayable_log_lines));
         }
 
-        // Simple tick for now
         app.on_tick();
 
     }
@@ -216,7 +272,12 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) -> Rect { // Return the Rect of th
                 ));
                 ListItem::new(line)
             } else {
-                ListItem::new(Line::from(format!("  {}", server.name))).style(Style::new().red())
+                if (app.allocated_servers.contains_key(&server.name)){
+                    ListItem::new(Line::from(format!("  {}", server.name))).style(Style::new().green())
+                }
+                else{
+                    ListItem::new(Line::from(format!("  {}", server.name))).style(Style::new().red())
+                }
             }
         })
         .collect();
