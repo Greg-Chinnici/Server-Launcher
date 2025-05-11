@@ -12,11 +12,11 @@ use ratatui::{
 use std::io;
 use std::time::Duration;
 use std::collections::HashMap;
-use crate::servers;
 use std::error::Error;
+use std::sync::mpsc::{Sender, Receiver, channel};
 
 use crate::{db::Server, servers::ServerHandle};
-use std::sync::mpsc::{Sender, Receiver, channel};
+use crate::servers;
 
 struct App {
     counter: i32,
@@ -134,7 +134,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             // Placeholder for launching/modifying server
                             app.logs.push(format!("Selected server: {}", app.available_servers[app.selected_server].name));
 
-                            match servers::launch(&app.available_servers[app.selected_server] , app.log_sender.clone())
+                            match servers::launch(&app.available_servers[app.selected_server] , app.log_sender.clone() , true)
                             {
                                 Ok(handle) => {
                                     app.allocated_servers.insert(app.available_servers[app.selected_server].name.clone(), handle);
@@ -147,8 +147,10 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         }
                         KeyCode::Char('x') |  KeyCode::Char('X') => {
                             // Placeholder for killing/modifying server
-                            app.logs.push("Pressed X".to_string());
                             app.logs.push(format!("Killing server: {}", app.available_servers[app.selected_server].name));
+                        }
+                        KeyCode::Char('c') |  KeyCode::Char('C') => {
+                            app.logs.clear();
                         }
                         _ => {}
                     }

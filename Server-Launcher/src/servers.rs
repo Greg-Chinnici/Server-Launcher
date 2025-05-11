@@ -6,6 +6,7 @@ use std::sync::mpsc::{Sender, channel};
 use std::thread;
 use std::io::{BufRead, BufReader, Result};
 use std::io;
+
 use crate::db::Server; // Use the Server struct from the db module
 
 pub struct ServerHandle {
@@ -16,8 +17,11 @@ pub struct ServerHandle {
 }
 
 
-pub fn launch(server: &Server, log_sender: Sender<String>) -> Result<ServerHandle>{
-    return dummy_launch(server, log_sender);
+pub fn launch(server: &Server, log_sender: Sender<String>, dummy: bool) -> Result<ServerHandle>{
+
+    if (dummy){
+        return dummy_launch(server, log_sender);
+    }
 
     let (shell, shell_flag, change_dir_prefix) = match std::env::consts::OS {
         "windows" => ("cmd", "/C", "cd /d"),
