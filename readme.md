@@ -5,6 +5,7 @@
 ## Plans 
 - [ ] Server Select
 - [ ] Server Launch
+- [ ] Dummy tcp localhost streaming
 - [ ] Minecraft LAN host
 - [ ] CS2 custom map LAN host
 - [ ] CS2 multiplayer private host
