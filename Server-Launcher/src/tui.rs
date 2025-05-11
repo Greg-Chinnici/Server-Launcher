@@ -6,7 +6,9 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*, style::palette::material::ORANGE, widgets::{Block, BorderType, Borders, Paragraph, Wrap}
+    prelude::*,
+    style::{palette::material::ORANGE, Modifier, Style},
+    widgets::{Block, BorderType, Borders, Paragraph, Wrap, List, ListItem},
 };
 use std::{io, time::Duration, error::Error};
 
@@ -110,13 +112,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                         KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Down => {
                             // Placeholder for moving down in server list
                             app.logs.push("Select Down".to_string());
-                            app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, -1);
+                            app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, 1);
                             app.logs.push(format!("new index is {}" , app.selected_server));
                         }
                         KeyCode::Char('k') | KeyCode::Char('K') | KeyCode::Up => {
                             // Placeholder for moving up in server list
                             app.logs.push("Select Up".to_string());
-                            app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  1);
+                            app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  -1);
                             app.logs.push(format!("new index is {}" , app.selected_server));
                         }
                         KeyCode::Enter => {
@@ -170,16 +172,28 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
         .split(content_area_chunk); // Split the top part
 
     // Left Panel: Server List
-    let left_panel_content = Paragraph::new(format!(
-        "Server List\n\n{} Server 1\n{} Server 2\n{} Server 3\n\nCounter: {}",
-        format!("○"),
-        format!("○"),
-        format!("○"),
-        app.counter
-    ))
-    .block(Block::default().title("Servers").borders(Borders::ALL).border_style(Style::new().light_blue()))
-    .wrap(Wrap { trim: true });
-    f.render_widget(left_panel_content, content_chunks[0]);
+    let server_items: Vec<ListItem> = app.available_servers
+        .iter()
+        .enumerate()
+        .map(|(i, server)| {
+            if i == app.selected_server {
+                let line = Line::from(Span::styled(
+                    format!("> {}", server.name),
+                    Style::default().add_modifier(Modifier::UNDERLINED),
+                ));
+                ListItem::new(line)
+            } else {
+                ListItem::new(Line::from(format!("  {}", server.name)))
+            }
+        })
+        .collect();
+
+        let server_list = List::new(server_items)
+            .block(Block::default().title("Servers").borders(Borders::ALL).border_style(Style::new().light_blue()))
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD)) // Example: Boldens the selected item further if needed by the list
+            .highlight_symbol("> "); // If you want list to handle the selection symbol
+
+        f.render_widget(server_list, content_chunks[0]);
 
     // Right Panel: Log Output
     let log_text: Vec<Line> = app.logs.iter().map(|log| Line::from(log.as_str())).collect();
@@ -201,6 +215,7 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
 
 
 fn wrap_index(index: usize, max_index: usize, delta: isize) -> usize {
+
     let len = max_index + 1;
     let current_idx_signed = index as isize;
     let len_signed = len as isize;
