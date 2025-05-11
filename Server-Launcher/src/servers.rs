@@ -100,7 +100,7 @@ pub fn launch(
 
     let stdout = child.stdout.take().ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not capture stdout."))?;
     let stderr = child.stderr.take().ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not capture stderr."))?;
-    
+
     let name_clone_stdout = server.name.clone();
     let log_sender_clone_stdout = log_sender.clone();
     let event_sender_clone_stdout = server_event_sender.clone(); // Clone for stdout thread
@@ -168,9 +168,8 @@ fn dummy_launch(
     let name = server.name.clone();
     let log_sender_clone = log_sender.clone();
     let event_sender_clone = server_event_sender.clone();
-
     thread::spawn(move || {
-        for i in 0..5 {
+        for i in 0..15 {
             if let Err(e) = log_sender_clone.send(format!("[{}] Dummy server running... {}", name, i)) {
                 // Log error, but don't send it back through the same channel to avoid loops
                 eprintln!("[{}] Error sending dummy log: {}", name, e);

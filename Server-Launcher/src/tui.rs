@@ -265,7 +265,7 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) -> Rect { // Return the Rect of th
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(0),       // Main content area takes the rest of the space
-            Constraint::Length(3),    // Controls panel: 1 line for text, 2 for borders
+            Constraint::Length(4),    // Controls panel: 2 lines for text, 2 for borders
         ].as_ref())
         .split(f.size());
 
@@ -327,11 +327,16 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) -> Rect { // Return the Rect of th
     f.render_widget(right_panel_content, log_panel_frame_rect);
 
     // Bottom Panel: Controls
-    let controls_spans = Line::from(vec![
-        Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("(J or Down) / (K or Up) = Navigate | Enter = Select/Launch | Q = Quit"),
+    let controls_line1 = Line::from(vec![
+        Span::raw("(J/Down, K/Up) Navigate Servers | (Enter) Launch/Select"),
     ]);
-    let controls_panel = Paragraph::new(controls_spans)
+    let controls_line2 = Line::from(vec![
+        Span::raw("(X) Kill Server | (C) Clear Logs | (Q/Esc) Quit"),
+    ]);
+
+    let controls_text = vec![controls_line1, controls_line2];
+
+    let controls_panel = Paragraph::new(controls_text)
         .block(Block::default().title("Controls").borders(Borders::ALL))
         .alignment(Alignment::Center);
     f.render_widget(controls_panel, controls_chunk);
