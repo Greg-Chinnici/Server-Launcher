@@ -10,7 +10,11 @@ use ratatui::{
 };
 use std::{io, time::Duration, error::Error};
 
-use crate::db::Server;
+use std::collections::HashMap;
+use crate::servers;
+
+use crate::{db::Server, servers::ServerHandle};
+use std::sync::mpsc::{Sender, channel};
 
 struct App {
     counter: i32,
@@ -19,6 +23,8 @@ struct App {
     available_servers :Vec<Server>,
     selected_server: usize,
     terminal_height: usize,
+    allocated_servers: HashMap<String, ServerHandle>,
+    log_sender: Sender<String>,
 }
 
 impl App {
@@ -54,7 +60,19 @@ impl App {
             ],
             selected_server: 0,
             // TODO make this change when resize and drive the length of log vec
-            terminal_height: 40
+            terminal_height: 40,
+            allocated_servers: HashMap::new(),
+            log_sender: {
+                let (sender, receiver) = channel();
+                // Spawn a thread to handle log messages
+                std::thread::spawn(move || {
+                    while let Ok(log) = receiver.recv() {
+                        // Handle log messages here
+                        println!("Log: {}", log);
+                    }
+                });
+                sender
+            }
         }
     }
 
@@ -124,6 +142,17 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             // Placeholder for launching/modifying server
                             app.logs.push("Pressed Enter".to_string());
                             app.logs.push(format!("Selected server: {}", app.available_servers[app.selected_server].name));
+                            
+                            match servers::launch(&app.available_servers[app.selected_server] , app.log_sender.clone())
+                            {
+                                Ok(handle) => {
+                                    app.allocated_servers.insert(app.available_servers[app.selected_server].name.clone(), handle);
+                                    app.logs.push(format!("Server {} launched successfully.", app.available_servers[app.selected_server].name));
+                                }
+                                Err(e) => {
+                                    app.logs.push(format!("Failed to launch server {}: {}", app.available_servers[app.selected_server].name, e));
+                                }
+                            }
                         }
                         KeyCode::Char('x') |  KeyCode::Char('X') => {
                             // Placeholder for killing/modifying server

@@ -17,6 +17,8 @@ pub struct ServerHandle {
 
 
 pub fn launch(server: &Server, log_sender: Sender<String>) -> Result<ServerHandle>{
+    return dummy_launch(server, log_sender);
+
     let (shell, shell_flag, change_dir_prefix) = match std::env::consts::OS {
         "windows" => ("cmd", "/C", "cd /d"),
         "macos" | "linux" => ("sh", "-c", "cd"),
@@ -104,3 +106,21 @@ pub fn launch(server: &Server, log_sender: Sender<String>) -> Result<ServerHandl
 }
 
 // Kill Server Function
+fn dummy_launch(server: &Server, log_sender: Sender<String>) -> Result<ServerHandle>{
+    let (tx, rx) = channel();
+    let name = server.name.clone();
+    let sender_clone = log_sender.clone();
+
+    // Spawn a thread to simulate server launch
+    thread::spawn(move || {
+        for i in 0..5 {
+            if let Err(e) = sender_clone.send(format!("[{}] Dummy server running... {}", name, i)) {
+                eprintln!("[{}] Error sending dummy log: {}", name, e);
+            }
+            thread::sleep(std::time::Duration::from_secs(1));
+        }
+        tx.send(()).unwrap();
+    });
+
+    Ok(ServerHandle { child: None, name: server.name.clone(), sender: log_sender ,running: true})
+}
