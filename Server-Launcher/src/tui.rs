@@ -6,9 +6,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*,
-    style::{palette::material::ORANGE, Modifier, Style},
-    widgets::{Block, BorderType, Borders, Paragraph, Wrap, List, ListItem},
+    prelude::*, style::{palette::material::ORANGE, Modifier, Style}, terminal, widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
 };
 use std::{io, time::Duration, error::Error};
 
@@ -20,6 +18,7 @@ struct App {
     logs: Vec<String>,
     available_servers :Vec<Server>,
     selected_server: usize,
+    terminal_height: usize,
 }
 
 impl App {
@@ -54,6 +53,8 @@ impl App {
                 }
             ],
             selected_server: 0,
+            // TODO make this change when resize and drive the length of log vec
+            terminal_height: 40
         }
     }
 
@@ -63,7 +64,7 @@ impl App {
         // Example: Add a new log entry periodically or when a server sends output
         // self.logs.push(format!("Tick: {}", self.counter));
         // Keep logs manageable
-        if self.logs.len() > 20 {
+        if self.logs.len() > self.terminal_height - 5 {
             self.logs.remove(0);
         }
     }
@@ -113,13 +114,11 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             // Placeholder for moving down in server list
                             app.logs.push("Select Down".to_string());
                             app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, 1);
-                            app.logs.push(format!("new index is {}" , app.selected_server));
                         }
                         KeyCode::Char('k') | KeyCode::Char('K') | KeyCode::Up => {
                             // Placeholder for moving up in server list
                             app.logs.push("Select Up".to_string());
                             app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  -1);
-                            app.logs.push(format!("new index is {}" , app.selected_server));
                         }
                         KeyCode::Enter => {
                             // Placeholder for launching/modifying server
@@ -149,6 +148,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
         }
         // Simple tick for now
         app.on_tick();
+
     }
 }
 
@@ -190,8 +190,8 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
 
         let server_list = List::new(server_items)
             .block(Block::default().title("Servers").borders(Borders::ALL).border_style(Style::new().light_blue()))
-            .highlight_style(Style::default().add_modifier(Modifier::BOLD)) // Example: Boldens the selected item further if needed by the list
-            .highlight_symbol("> "); // If you want list to handle the selection symbol
+            .highlight_style(Style::default().add_modifier(Modifier::BOLD))
+            .highlight_symbol("> ");
 
         f.render_widget(server_list, content_chunks[0]);
 
@@ -205,12 +205,13 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
     // Bottom Panel: Controls
     let controls_spans = Line::from(vec![
         Span::styled("Controls: ", Style::default().add_modifier(Modifier::BOLD)),
-        Span::raw("(J or ↑) / (K or ↓) = Navigate | Enter = Select/Launch | Q = Quit"),
+        Span::raw("(J or Down) / (K or Up) = Navigate | Enter = Select/Launch | Q = Quit"),
     ]);
     let controls_panel = Paragraph::new(controls_spans)
         .block(Block::default().title("Controls").borders(Borders::ALL))
         .alignment(Alignment::Center);
     f.render_widget(controls_panel, controls_chunk);
+
 }
 
 
