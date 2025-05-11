@@ -183,7 +183,7 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) {
                 ));
                 ListItem::new(line)
             } else {
-                ListItem::new(Line::from(format!("  {}", server.name)))
+                ListItem::new(Line::from(format!("  {}", server.name))).style(Style::new().red())
             }
         })
         .collect();

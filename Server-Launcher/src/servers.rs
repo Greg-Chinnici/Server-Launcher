@@ -1,4 +1,5 @@
 
+use std::collections::hash_map;
 use std::error::Error;
 use std::process::{Command, Child, Stdio};
 use std::sync::mpsc::{Sender, channel};
@@ -13,6 +14,7 @@ pub struct ServerHandle {
     pub sender: Sender<String>,
     pub running: bool,
 }
+
 
 pub fn launch(server: &Server, log_sender: Sender<String>) -> Result<ServerHandle>{
     let (shell, shell_flag, change_dir_prefix) = match std::env::consts::OS {
