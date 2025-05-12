@@ -1,18 +1,17 @@
-
-mod tui;
-mod servers;
 mod db;
-
-
+mod servers;
+mod tui;
 
 fn main() -> std::io::Result<()> {
     // get server states from local db
     let conn = db::connect_db("path_to_db");
-    match conn{
+    match conn {
         Ok(connection) => {
             let mut available_Servers = db::load_servers(&connection);
-        },
-        _ => {println!("Error geting servers")}
+        }
+        _ => {
+            println!("Error geting servers")
+        }
     }
 
     if let Err(e) = tui::init_tui() {

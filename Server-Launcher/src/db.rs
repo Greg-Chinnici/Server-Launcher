@@ -31,14 +31,19 @@ pub fn connect_db(path: &str) -> Result<Connection> {
 }
 
 pub fn load_servers(conn: &Connection) -> Result<Vec<Server>> {
-    let mut stmt = conn.prepare("SELECT id, name, path, executable, args, autostart FROM servers")?;
+    let mut stmt =
+        conn.prepare("SELECT id, name, path, executable, args, autostart FROM servers")?;
     let rows = stmt.query_map([], |row| {
         Ok(Server {
             id: row.get(0)?,
             name: row.get(1)?,
             path: row.get(2)?,
             executable: row.get(3)?,
-            args: row.get::<_, String>(4)?.split_whitespace().map(String::from).collect(),
+            args: row
+                .get::<_, String>(4)?
+                .split_whitespace()
+                .map(String::from)
+                .collect(),
             autostart: row.get::<_, i32>(5)? != 0,
         })
     })?;
