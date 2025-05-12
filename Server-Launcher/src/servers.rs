@@ -1,9 +1,7 @@
-use std::collections::hash_map;
-use std::error::Error;
 use std::io;
 use std::io::{BufRead, BufReader, Result};
 use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::{channel, Sender};
+use std::sync::mpsc::Sender;
 use std::thread;
 
 use crate::db::Server; // Use the Server struct from the db module

@@ -1,16 +1,14 @@
 use crossterm::{
     event::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind,
-        KeyboardEnhancementFlags, PushKeyboardEnhancementFlags,
     },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
     prelude::*,
-    style::{palette::tailwind::GREEN, Modifier, Style},
-    terminal,
-    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
+    style::{Modifier, Style},
+    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
 use std::collections::HashMap;
 use std::error::Error;

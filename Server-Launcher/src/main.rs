@@ -7,7 +7,7 @@ fn main() -> std::io::Result<()> {
     let conn = db::connect_db("path_to_db");
     match conn {
         Ok(connection) => {
-            let mut available_Servers = db::load_servers(&connection);
+            let available_Servers = db::load_servers(&connection);
         }
         _ => {
             println!("Error geting servers")
