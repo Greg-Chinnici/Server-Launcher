@@ -1,12 +1,10 @@
-
-
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyboardEnhancementFlags, PushKeyboardEnhancementFlags},
-    execute, queue,
+    execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*, style::{palette::material::ORANGE, Modifier, Style}, terminal,
+    prelude::*, style::{palette::tailwind::GREEN, Modifier, Style}, terminal,
     widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
 };
 use std::io;
@@ -25,8 +23,10 @@ struct App {
     available_servers :Vec<Server>,
     selected_server: usize,
     allocated_servers: HashMap<String, ServerHandle>,
+    // direct log data
     log_sender: Sender<String>,
     log_receiver: Receiver<String>,
+    // server open / close
     server_event_sender: Sender<ServerLifecycleEvent>,
     server_event_receiver: Receiver<ServerLifecycleEvent>,
 }
@@ -34,7 +34,7 @@ struct App {
 impl App {
     fn new() -> App {
         let (log_sender, log_receiver) = channel();
-        let (server_event_sender, server_event_receiver) = channel(); // Create server event channel
+        let (server_event_sender, server_event_receiver) = channel();
         App {
             counter: 0,
             logs: vec!["Log panel initialized.".to_string()],
@@ -89,7 +89,6 @@ impl App {
                 }
             ],
             selected_server: 0,
-            // TODO make this change when resize and drive the length of log vec
             allocated_servers: HashMap::new(),
             log_sender,
             log_receiver,
@@ -133,10 +132,10 @@ impl App {
         }
 
         for name in server_names_to_remove {
-            if self.allocated_servers.remove(&name).is_some() {
-                self.logs.push(format!("Server {} removed from allocated map.", name));
-            }
+            self.allocated_servers.remove(&name);
         }
+
+
     }
 }
 
@@ -182,11 +181,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Char('Q') | KeyCode::Esc => return Ok(()),
                         KeyCode::Char('j') | KeyCode::Char('J') | KeyCode::Down => {
-                            // Placeholder for moving down in server list
                             app.selected_server = wrap_index(app.selected_server, app.available_servers.len()-1, 1);
                         }
                         KeyCode::Char('k') | KeyCode::Char('K') | KeyCode::Up => {
-                            // Placeholder for moving up in server list
                             app.selected_server = wrap_index(app.selected_server , app.available_servers.len()-1,  -1);
                         }
                         KeyCode::Enter => {
@@ -260,7 +257,6 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
 }
 
 fn ui<B: Backend>(f: &mut Frame<>, app: &App) -> Rect { // Return the Rect of the log panel frame
-    // Main vertical layout: one for app content, one for controls
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
@@ -283,20 +279,11 @@ fn ui<B: Backend>(f: &mut Frame<>, app: &App) -> Rect { // Return the Rect of th
         .iter()
         .enumerate()
         .map(|(i, server)| {
-            if i == app.selected_server {
-                let line = Line::from(Span::styled(
-                    format!("> {}", server.name),
-                    Style::default().add_modifier(Modifier::UNDERLINED),
-                ));
-                ListItem::new(line)
-            } else {
-                if (app.allocated_servers.contains_key(&server.name)){
-                    ListItem::new(Line::from(format!("  {}", server.name))).style(Style::new().green())
-                }
-                else{
-                    ListItem::new(Line::from(format!("  {}", server.name))).style(Style::new().red())
-                }
-            }
+            let line = Line::from(Span::styled(
+                if i == app.selected_server {format!("> {}", server.name)} else {format!("{}", server.name)},
+                style_builder(i , server.clone(), app))
+            );
+            ListItem::new(line)
         })
         .collect();
 
@@ -353,4 +340,20 @@ fn wrap_index(index: usize, max_index: usize, delta: isize) -> usize {
     let new_idx_signed = current_idx_signed + delta;
     let result_signed = new_idx_signed.rem_euclid(len_signed);
     result_signed as usize
+}
+
+fn style_builder(index: usize , server:Server,  app: &App) -> Style{
+    let mut style = Style::new();
+
+    if (app.allocated_servers.contains_key(&server.name)){
+        style = style.fg(Color::Green);
+    }else{
+        style = style.fg(Color::Red);
+    }
+
+    if (index == app.selected_server) {
+       style = style.patch(Style::default().add_modifier(Modifier::UNDERLINED));
+    }
+
+    style
 }

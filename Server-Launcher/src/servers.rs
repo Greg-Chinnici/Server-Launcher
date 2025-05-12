@@ -64,8 +64,7 @@ pub fn launch(
         }
     };
 
-    // Construct the command to change directory and then execute the server.
-    // For macos/linux, ensure the path is quoted if it contains spaces.
+
     let cd_command = if std::env::consts::OS == "windows" {
         format!("{} {}", change_dir_prefix, server.path)
     } else {
