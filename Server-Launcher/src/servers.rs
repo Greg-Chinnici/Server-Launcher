@@ -40,6 +40,7 @@ impl ServerHandle {
             // If there's no child process (e.g., dummy server or already stopped)
             self.running = false;
             // Send an exit event even for dummy servers or if no child process
+            // Dummy Servers not exiting correctly
             let _ = self.server_event_sender.send(ServerLifecycleEvent::Exited {
                 name: self.name.clone(),
             });

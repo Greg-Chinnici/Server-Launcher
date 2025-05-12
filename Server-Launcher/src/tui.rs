@@ -200,9 +200,9 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                             );
                         }
                         KeyCode::Enter => {
-                            if (app
+                            if app
                                 .allocated_servers
-                                .contains_key(&app.available_servers[app.selected_server].name))
+                                .contains_key(&app.available_servers[app.selected_server].name)
                             {
                                 continue;
                             }
@@ -399,13 +399,13 @@ fn wrap_index(index: usize, max_index: usize, delta: isize) -> usize {
 fn style_builder(index: usize, server: Server, app: &App) -> Style {
     let mut style = Style::new();
 
-    if (app.allocated_servers.contains_key(&server.name)) {
+    if app.allocated_servers.contains_key(&server.name) {
         style = style.fg(Color::Green);
     } else {
         style = style.fg(Color::Red);
     }
 
-    if (index == app.selected_server) {
+    if index == app.selected_server {
         style = style.patch(
             Style::default()
                 .add_modifier(Modifier::UNDERLINED)
