@@ -65,7 +65,7 @@ impl App {
                     name: "Timer 2".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "4".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
                     test_server: Some(false)
                 },
@@ -74,7 +74,7 @@ impl App {
                     name: "Timer 3 (custom)".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string() , "custom python message".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "14".to_string() , "custom python message".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
                     test_server: Some(false)
                 },
@@ -83,7 +83,7 @@ impl App {
                     name: "Timer 4".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "11".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
                     test_server: Some(false)
                 },
