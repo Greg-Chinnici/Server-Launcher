@@ -25,3 +25,5 @@ Day One
 ![First Day](assets/ServerLauncher_v1.png)
 Day Two
 ![Second Day](assets/ServerLauncher_v2.png)
+Day Three
+![Third Day](assets/ServerLauncher_v3.png)
