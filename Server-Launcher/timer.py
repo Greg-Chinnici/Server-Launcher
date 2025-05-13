@@ -8,4 +8,4 @@ if not n:
 
 for i in range(n):
     time.sleep(0.5)
-    print(f"{i+1}: from python")
+    print(f"python has a {i} for you")

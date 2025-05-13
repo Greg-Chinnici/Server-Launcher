@@ -49,6 +49,7 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false,
+                    test_server: Some(true)
                 },
                 Server {
                     id: 2,
@@ -57,6 +58,7 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false,
+                    test_server: Some(true)
                 },
                 Server {
                     id: 3,
@@ -64,7 +66,9 @@ impl App {
                     path: "/C".to_string(),
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: true,
+                    autostart: false,
+                    test_server: Some(true)
+
                 },
                 Server {
                     id: 4,
@@ -73,6 +77,8 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false,
+                    test_server: Some(true)
+
                 },
                 Server {
                     id: 5,
@@ -81,6 +87,7 @@ impl App {
                     executable: "python3".to_string(),
                     args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
+                    test_server: Some(false)
                 },
                 Server {
                     id: 6,
@@ -89,6 +96,8 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false,
+                    test_server: Some(true)
+
                 },
             ],
             selected_server: 0,
@@ -210,7 +219,6 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
                                 &app.available_servers[app.selected_server],
                                 app.log_sender.clone(),
                                 app.server_event_sender.clone(),
-                                false,
                             ) {
                                 Ok(handle) => {
                                     app.allocated_servers.insert(

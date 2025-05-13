@@ -10,6 +10,7 @@ pub struct Server {
     pub executable: String,
     pub args: Vec<String>,
     pub autostart: bool,
+    pub test_server: Option<bool>,
 }
 
 pub fn connect_db(path: &str) -> Result<Connection> {
@@ -45,6 +46,7 @@ pub fn load_servers(conn: &Connection) -> Result<Vec<Server>> {
                 .map(String::from)
                 .collect(),
             autostart: row.get::<_, i32>(5)? != 0,
+            test_server: row.get::<_, Option<bool>>(6)?
         })
     })?;
 
