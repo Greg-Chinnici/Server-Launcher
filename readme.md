@@ -12,7 +12,7 @@
 - [x] Server Select
 - [x] Server Launch
 - [x] Dummy tcp localhost streaming
-- [ ] Minecraft LAN host
+- [x] Minecraft LAN host
 - [ ] CS2 custom map LAN host
 - [ ] CS2 multiplayer private host
 - [ ] color formatted print per server
