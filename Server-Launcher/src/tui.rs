@@ -53,36 +53,34 @@ impl App {
                 },
                 Server {
                     id: 2,
-                    name: "Server 2".to_string(),
-                    path: "/C".to_string(),
-                    executable: "server.jar".to_string(),
-                    args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: false,
-                    test_server: Some(true)
+                    name: "Timer 1".to_string(),
+                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
+                    executable: "python3".to_string(),
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
+                    autostart: true,
+                    test_server: Some(false)
                 },
                 Server {
                     id: 3,
-                    name: "Server 3".to_string(),
-                    path: "/C".to_string(),
-                    executable: "server.jar".to_string(),
-                    args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: false,
-                    test_server: Some(true)
-
+                    name: "Timer 2".to_string(),
+                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
+                    executable: "python3".to_string(),
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
+                    autostart: true,
+                    test_server: Some(false)
                 },
                 Server {
                     id: 4,
-                    name: "Server 4".to_string(),
-                    path: "/C".to_string(),
-                    executable: "server.jar".to_string(),
-                    args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: false,
-                    test_server: Some(true)
-
+                    name: "Timer 3 (custom)".to_string(),
+                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
+                    executable: "python3".to_string(),
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string() , "custom python message".to_string()], // needs the -u to run python in unbuffered mode
+                    autostart: true,
+                    test_server: Some(false)
                 },
                 Server {
                     id: 5,
-                    name: "Timer".to_string(),
+                    name: "Timer 4".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
                     args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
@@ -280,7 +278,7 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
         while let Ok(event) = app.server_event_receiver.try_recv() {
             match event {
                 ServerLifecycleEvent::Exited { name } => {
-                    app.logs.push_back(format!("Server {} signalled exit.", name));
+                    app.logs.push_back(format!("Server {} has exited.", name));
                     if let Some(handle) = app.allocated_servers.get_mut(&name) {
                         handle.running = false;
                     }
