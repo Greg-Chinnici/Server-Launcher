@@ -18,6 +18,7 @@
 - [ ] color formatted print per server
 - [ ] runtime add server with popup
 - [ ] better way to add, manage, load servers
+- [ ] wrap the server messages in a struct
 
 # Progress
 Day One
