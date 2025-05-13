@@ -88,11 +88,11 @@ impl App {
                 Server {
                     id: 6,
                     name: "Minecraft Server".to_string(),
-                    path: "/C".to_string(),
-                    executable: "server.jar".to_string(),
-                    args: vec!["arg1".to_string(), "arg2".to_string()],
+                    path: "/Users/student/Downloads/MinecraftServer".to_string(),
+                    executable: "./start_Server.sh".to_string(),
+                    args: vec![],
                     autostart: false,
-                    test_server: Some(true)
+                    test_server: Some(false)
 
                 },
             ],
