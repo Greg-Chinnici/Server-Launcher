@@ -11,6 +11,9 @@ for index , arg in enumerate(sys.argv):
     if index == 2:
         message = str(sys.argv[2])
 
+tick_timeout = 0.5
+print(f"Timer will go for {tick_timeout * n} seconds")
+
 for i in range(n):
-    time.sleep(0.5)
+    time.sleep(tick_timeout)
     print(f" {i} {message}")
