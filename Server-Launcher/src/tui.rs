@@ -265,6 +265,9 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
                         KeyCode::Char('c') | KeyCode::Char('C') => {
                             app.logs.clear();
                         }
+                        KeyCode::Char(' ') => {
+                            app.logs.push_back(format!("Pressed Space, should open popup"));
+                        }
                         _ => {}
                     }
                 }
