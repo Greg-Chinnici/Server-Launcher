@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{BufRead, BufReader, Result};
+use std::io::{BufRead, BufReader, Result, Read};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::Sender;
 use std::thread;
@@ -48,42 +48,66 @@ impl ServerHandle {
     }
 }
 
-
 fn build_command(server: &Server) -> Result<Command> {
-    let (shell, shell_flag, change_dir_prefix) = match std::env::consts::OS {
+    let os = std::env::consts::OS;
+    let (shell, shell_flag, cd_prefix) = match os {
         "windows" => ("cmd", "/C", "cd /d"),
-        "macos" | "linux" => ("sh", "-c", "cd"),
-        _ => {
-            return Err(io::Error::new(io::ErrorKind::Unsupported, "Unsupported OS"));
-        }
+        "linux" | "macos" => ("sh", "-c", "cd"),
+        _ => return Err(io::Error::new(io::ErrorKind::Unsupported, "Unsupported OS")),
     };
 
-    let cd_command = if std::env::consts::OS == "windows" {
-        format!("{} {}", change_dir_prefix, server.path)
-    } else {
-        format!("{} '{}'", change_dir_prefix, server.path)
-    };
+    let cd_command = format!("{} {}", cd_prefix, shell_escape(&server.path));
+    let exec_command = format!("{} {}", server.executable, server.args.join(" "));
+    let full_command = format!("{} && {}", cd_command, exec_command);
 
-    let full_command = format!(
-        "{} && {} {}",
-        cd_command,
-        server.executable,
-        server.args.join(" ")
-    );
-
-    let mut command_builder = Command::new(shell);
-    command_builder
-        .args([shell_flag, &full_command])
+    let mut command = Command::new(shell);
+    command
+        .arg(shell_flag)
+        .arg(full_command)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    if std::env::consts::OS != "windows" {
-        command_builder.current_dir(&server.path);
-        let new_full_command = format!("{} {}", server.executable, server.args.join(" "));
-        command_builder.args([shell_flag, &new_full_command]);
-    }
+    Ok(command)
+}
 
-    Ok(command_builder)
+fn shell_escape(path: &str) -> String {
+    if std::env::consts::OS == "windows" {
+        path.to_string()
+    } else {
+        format!("'{}'", path.replace('\'', "'\\''"))
+    }
+}
+fn capture_output<R: Read + Send + 'static>(
+    reader: R,
+    name: String,
+    is_stderr: bool,
+    sender: Sender<String>,
+    event_sender: Sender<ServerLifecycleEvent>,
+) {
+    thread::spawn(move || {
+        let reader = std::io::BufReader::new(reader);
+        for line in reader.lines() {
+            match line {
+                Ok(line_content) => {
+                    let prefix = if is_stderr { "[stderr] " } else { "" };
+                    let msg = format!("[{}] {}{}", name, prefix, line_content);
+                    if let Err(e) = sender.send(msg) {
+                        eprintln!("[{}] Error sending log: {}", name, e);
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "[{}] Error reading {} line: {}",
+                        name,
+                        if is_stderr { "stderr" } else { "stdout" },
+                        e
+                    );
+                    break;
+                }
+            }
+        }
+        let _ = event_sender.send(ServerLifecycleEvent::Exited { name });
+    });
 }
 
 pub fn launch(
@@ -97,7 +121,6 @@ pub fn launch(
     }
 
     let mut command = build_command(server)?;
-
     let mut child = command.spawn().map_err(|e| {
         io::Error::new(
             e.kind(),
@@ -108,63 +131,26 @@ pub fn launch(
     let stdout = child
         .stdout
         .take()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not capture stdout."))?;
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not capture stdout"))?;
     let stderr = child
         .stderr
         .take()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not capture stderr."))?;
+        .ok_or_else(|| io::Error::new(io::ErrorKind::Other, "Could not capture stderr"))?;
 
-    let name_clone_stdout = server.name.clone();
-    let log_sender_clone_stdout = log_sender.clone();
-    let event_sender_clone_stdout = server_event_sender.clone();
-
-    thread::spawn(move || {
-        let reader = std::io::BufReader::new(stdout);
-        for line in reader.lines() {
-            match line {
-                Ok(line_content) => {
-                    if let Err(e) = log_sender_clone_stdout
-                        .send(format!("[{}] {}", name_clone_stdout, line_content))
-                    {
-                        eprintln!("[{}] Error sending stdout log: {}", name_clone_stdout, e);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[{}] Error reading stdout line: {}", name_clone_stdout, e);
-                    break;
-                }
-            }
-        }
-        let _ = event_sender_clone_stdout.send(ServerLifecycleEvent::Exited {
-            name: name_clone_stdout,
-        });
-    });
-
-    let name_clone_stderr = server.name.clone();
-    let log_sender_clone_stderr = log_sender.clone();
-    let event_sender_clone_stderr = server_event_sender.clone();
-
-    thread::spawn(move || {
-        let reader = std::io::BufReader::new(stderr);
-        for line in reader.lines() {
-            match line {
-                Ok(line_content) => {
-                    if let Err(e) = log_sender_clone_stderr
-                        .send(format!("[{}] [stderr] {}", name_clone_stderr, line_content))
-                    {
-                        eprintln!("[{}] Error sending stderr log: {}", name_clone_stderr, e);
-                    }
-                }
-                Err(e) => {
-                    eprintln!("[{}] Error reading stderr line: {}", name_clone_stderr, e);
-                    break;
-                }
-            }
-        }
-        let _ = event_sender_clone_stderr.send(ServerLifecycleEvent::Exited {
-            name: name_clone_stderr,
-        });
-    });
+    capture_output(
+        stdout,
+        server.name.clone(),
+        false,
+        log_sender.clone(),
+        server_event_sender.clone(),
+    );
+    capture_output(
+        stderr,
+        server.name.clone(),
+        true,
+        log_sender.clone(),
+        server_event_sender.clone(),
+    );
 
     Ok(ServerHandle {
         child: Some(child),
