@@ -76,11 +76,11 @@ impl App {
                 },
                 Server {
                     id: 5,
-                    name: "Server 5".to_string(),
-                    path: "/C".to_string(),
-                    executable: "server.jar".to_string(),
-                    args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: false,
+                    name: "Timer".to_string(),
+                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
+                    executable: "python3".to_string(),
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
+                    autostart: true,
                 },
                 Server {
                     id: 6,
@@ -210,7 +210,7 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
                                 &app.available_servers[app.selected_server],
                                 app.log_sender.clone(),
                                 app.server_event_sender.clone(),
-                                true,
+                                false,
                             ) {
                                 Ok(handle) => {
                                     app.allocated_servers.insert(

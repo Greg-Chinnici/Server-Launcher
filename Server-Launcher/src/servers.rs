@@ -77,6 +77,7 @@ fn shell_escape(path: &str) -> String {
         format!("'{}'", path.replace('\'', "'\\''"))
     }
 }
+
 fn capture_output<R: Read + Send + 'static>(
     reader: R,
     name: String,
