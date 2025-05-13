@@ -1,3 +1,4 @@
+use ratatui::style::Color;
 use rusqlite::{params, Connection, Result};
 
 

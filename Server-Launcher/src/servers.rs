@@ -42,21 +42,14 @@ impl ServerHandle {
             let _ = self.server_event_sender.send(ServerLifecycleEvent::Exited {
                 name: self.name.clone(),
             });
+
             Ok(())
         }
     }
 }
 
-pub fn launch(
-    server: &Server,
-    log_sender: Sender<String>,
-    server_event_sender: Sender<ServerLifecycleEvent>,
-    dummy: bool,
-) -> Result<ServerHandle> {
-    if dummy {
-        return dummy_launch(server, log_sender, server_event_sender);
-    }
 
+fn build_command(server: &Server) -> Result<Command> {
     let (shell, shell_flag, change_dir_prefix) = match std::env::consts::OS {
         "windows" => ("cmd", "/C", "cd /d"),
         "macos" | "linux" => ("sh", "-c", "cd"),
@@ -77,7 +70,6 @@ pub fn launch(
         server.executable,
         server.args.join(" ")
     );
-    println!("Launching: {}", full_command); // Keep a simple print for now, color removed
 
     let mut command_builder = Command::new(shell);
     command_builder
@@ -85,24 +77,28 @@ pub fn launch(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped());
 
-    // Set the working directory directly on the Command builder if not on Windows,
-    // as `cd` in `sh -c "cd ... && ..."` might not persist for the subsequent command
-    // in all shell versions or scenarios.
-    // For Windows, `cd /d` within `cmd /C` works as expected.
     if std::env::consts::OS != "windows" {
         command_builder.current_dir(&server.path);
-        // Re-form full_command for non-Windows as cd is handled by current_dir
         let new_full_command = format!("{} {}", server.executable, server.args.join(" "));
-        command_builder.args([shell_flag, &new_full_command]); // Reset args
-        println!(
-            "Adjusted Launching (non-windows): sh -c \"{} {}\" in directory {}",
-            server.executable,
-            server.args.join(" "),
-            server.path
-        );
+        command_builder.args([shell_flag, &new_full_command]);
     }
 
-    let mut child = command_builder.spawn().map_err(|e| {
+    Ok(command_builder)
+}
+
+pub fn launch(
+    server: &Server,
+    log_sender: Sender<String>,
+    server_event_sender: Sender<ServerLifecycleEvent>,
+    dummy: bool,
+) -> Result<ServerHandle> {
+    if dummy {
+        return dummy_launch(server, log_sender, server_event_sender);
+    }
+
+    let mut command = build_command(server)?;
+
+    let mut child = command.spawn().map_err(|e| {
         io::Error::new(
             e.kind(),
             format!("Failed to spawn server {}: {}", server.name, e),
@@ -120,11 +116,10 @@ pub fn launch(
 
     let name_clone_stdout = server.name.clone();
     let log_sender_clone_stdout = log_sender.clone();
-    let event_sender_clone_stdout = server_event_sender.clone(); // Clone for stdout thread
+    let event_sender_clone_stdout = server_event_sender.clone();
 
-    // Spawn a thread to read stdout
     thread::spawn(move || {
-        let reader = BufReader::new(stdout);
+        let reader = std::io::BufReader::new(stdout);
         for line in reader.lines() {
             match line {
                 Ok(line_content) => {
@@ -136,12 +131,10 @@ pub fn launch(
                 }
                 Err(e) => {
                     eprintln!("[{}] Error reading stdout line: {}", name_clone_stdout, e);
-                    // Optionally send an error event or log it, then break or continue
                     break;
                 }
             }
         }
-        // Stream ended, imply process might be exiting
         let _ = event_sender_clone_stdout.send(ServerLifecycleEvent::Exited {
             name: name_clone_stdout,
         });
@@ -149,10 +142,10 @@ pub fn launch(
 
     let name_clone_stderr = server.name.clone();
     let log_sender_clone_stderr = log_sender.clone();
-    let event_sender_clone_stderr = server_event_sender.clone(); // Clone for stderr thread
-                                                                 // Same for stderr
+    let event_sender_clone_stderr = server_event_sender.clone();
+
     thread::spawn(move || {
-        let reader = BufReader::new(stderr);
+        let reader = std::io::BufReader::new(stderr);
         for line in reader.lines() {
             match line {
                 Ok(line_content) => {
@@ -164,12 +157,10 @@ pub fn launch(
                 }
                 Err(e) => {
                     eprintln!("[{}] Error reading stderr line: {}", name_clone_stderr, e);
-                    // Optionally send an error event or log it, then break or continue
                     break;
                 }
             }
         }
-        // Stream ended, imply process might be exiting
         let _ = event_sender_clone_stderr.send(ServerLifecycleEvent::Exited {
             name: name_clone_stderr,
         });
@@ -179,7 +170,7 @@ pub fn launch(
         child: Some(child),
         name: server.name.clone(),
         log_sender,
-        server_event_sender, // Pass the original sender
+        server_event_sender,
         running: true,
     })
 }
@@ -198,12 +189,10 @@ fn dummy_launch(
             if let Err(e) =
                 log_sender_clone.send(format!("[{}] Dummy server running... {}", name, i))
             {
-                // Log error, but don't send it back through the same channel to avoid loops
                 eprintln!("[{}] Error sending dummy log: {}", name, e);
             }
             thread::sleep(std::time::Duration::from_secs(1));
         }
-        // Dummy server "finishes"
         let _ = event_sender_clone.send(ServerLifecycleEvent::Exited { name: name.clone() });
     });
 

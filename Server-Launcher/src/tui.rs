@@ -10,19 +10,19 @@ use ratatui::{
     style::{Modifier, Style},
     widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
 };
-use std::collections::HashMap;
+use std::collections::{vec_deque, HashMap, VecDeque};
 use std::error::Error;
 use std::io;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
 use crate::servers::{self, ServerLifecycleEvent};
-use crate::{db::Server, servers::ServerHandle}; // Import ServerLifecycleEvent
+use crate::{db::Server, servers::ServerHandle};
 
 struct App {
     counter: i32,
     // Placeholder for server logs
-    logs: Vec<String>,
+    logs: VecDeque<String>,
     available_servers: Vec<Server>,
     selected_server: usize,
     allocated_servers: HashMap<String, ServerHandle>,
@@ -40,7 +40,7 @@ impl App {
         let (server_event_sender, server_event_receiver) = channel();
         App {
             counter: 0,
-            logs: vec!["Log panel initialized.".to_string()],
+            logs: VecDeque::from(["Log panel initialized.".to_string()]),
             available_servers: vec![
                 Server {
                     id: 1,
@@ -64,7 +64,7 @@ impl App {
                     path: "/C".to_string(),
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: false,
+                    autostart: true,
                 },
                 Server {
                     id: 4,
@@ -113,12 +113,12 @@ impl App {
                         Ok(Some(_status)) => {
                             // Process has exited
                             self.logs
-                                .push(format!("Server {} process has exited.", name));
+                                .push_back(format!("Server {} process has exited.", name));
                             handle.running = false; // Mark as not running
                         }
                         Ok(None) => { /* Process is still running */ }
                         Err(e) => {
-                            self.logs.push(format!(
+                            self.logs.push_back(format!(
                                 "Error checking status for server {}: {}. Marking as not running.",
                                 name, e
                             ));
@@ -172,15 +172,16 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<()> {
+fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) -> io::Result<()> {
+
     loop {
         let mut log_panel_frame_rect = Rect::default(); // To store the log panel's frame Rect
 
         terminal.draw(|f| {
-            log_panel_frame_rect = ui::<B>(f, app); // ui now returns the log panel's frame Rect
+            log_panel_frame_rect = ui::<backend>(f, app); // ui now returns the log panel's frame Rect
         })?;
 
-        // Event handling with a timeout. 20fps
+        // Event handling with a timeout. 1000 / 50 => 20fps
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
@@ -216,13 +217,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                                         app.available_servers[app.selected_server].name.clone(),
                                         handle,
                                     );
-                                    app.logs.push(format!(
+                                    app.logs.push_back(format!(
                                         "Server {} launched successfully.",
                                         app.available_servers[app.selected_server].name
                                     ));
                                 }
                                 Err(e) => {
-                                    app.logs.push(format!(
+                                    app.logs.push_back(format!(
                                         "Failed to launch server {}: {}",
                                         app.available_servers[app.selected_server].name, e
                                     ));
@@ -238,18 +239,17 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
                                 {
                                     match handle.kill_process() {
                                         Ok(_) => {
-                                            app.logs.push(format!("Attempting to kill server: {}. It will be removed from the list if successful.", server_name_to_kill));
-                                            // The on_tick logic will now pick up that `handle.running` is false and remove it.
+                                            app.logs.push_back(format!("Attempting to kill server: {}. It will be removed from the list if successful.", server_name_to_kill));
                                         }
                                         Err(e) => {
-                                            app.logs.push(format!(
+                                            app.logs.push_back(format!(
                                                 "Failed to kill server {}: {}",
                                                 server_name_to_kill, e
                                             ));
                                         }
                                     }
                                 } else {
-                                    app.logs.push(format!(
+                                    app.logs.push_back(format!(
                                         "Server {} is not currently running or allocated.",
                                         server_name_to_kill
                                     ));
@@ -266,13 +266,13 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
         }
 
         while let Ok(log_message) = app.log_receiver.try_recv() {
-            app.logs.push(log_message);
+            app.logs.push_back(log_message);
         }
 
         while let Ok(event) = app.server_event_receiver.try_recv() {
             match event {
                 ServerLifecycleEvent::Exited { name } => {
-                    app.logs.push(format!("Server {} signalled exit.", name));
+                    app.logs.push_back(format!("Server {} signalled exit.", name));
                     if let Some(handle) = app.allocated_servers.get_mut(&name) {
                         handle.running = false;
                     }
@@ -290,7 +290,7 @@ fn run_app<B: Backend>(terminal: &mut Terminal<B>, app: &mut App) -> io::Result<
     }
 }
 
-fn ui<B: Backend>(f: &mut Frame, app: &App) -> Rect {
+fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
     // Return the Rect of the log panel frame
     let main_chunks = Layout::default()
         .direction(Direction::Vertical)
@@ -301,7 +301,7 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) -> Rect {
             ]
             .as_ref(),
         )
-        .split(f.size());
+        .split(frame.size());
 
     let content_area_chunk = main_chunks[0];
     let controls_chunk = main_chunks[1];
@@ -340,7 +340,7 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) -> Rect {
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    f.render_widget(server_list, content_chunks[0]);
+    frame.render_widget(server_list, content_chunks[0]);
 
     // Right Panel: Log Output
     let log_panel_frame_rect = content_chunks[1]; // The Rect for the entire log panel widget (frame included)
@@ -365,7 +365,7 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) -> Rect {
         ) // orange
         .wrap(Wrap { trim: true })
         .scroll((scroll_offset_y, 0)); // Add scroll to show the bottom of the logs
-    f.render_widget(right_panel_content, log_panel_frame_rect);
+    frame.render_widget(right_panel_content, log_panel_frame_rect);
 
     // Bottom Panel: Controls
     let controls_line1 = Line::from(vec![Span::raw(
@@ -380,7 +380,7 @@ fn ui<B: Backend>(f: &mut Frame, app: &App) -> Rect {
     let controls_panel = Paragraph::new(controls_text)
         .block(Block::default().title("Controls").borders(Borders::ALL))
         .alignment(Alignment::Center);
-    f.render_widget(controls_panel, controls_chunk);
+    frame.render_widget(controls_panel, controls_chunk);
 
     content_chunks[1] // Return the Rect of the log panel's frame
 }
