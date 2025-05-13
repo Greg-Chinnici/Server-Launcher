@@ -6,9 +6,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*,
-    style::{Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Wrap},
+    prelude::*, style::{Modifier, Style}, symbols::scrollbar::VERTICAL, widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
 };
 use std::collections::{vec_deque, HashMap, VecDeque};
 use std::error::Error;
@@ -62,10 +60,10 @@ impl App {
                 },
                 Server {
                     id: 3,
-                    name: "Timer 2".to_string(),
+                    name: "Ascii Image".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "4".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string() , "ascii_image.py".to_string(),], // needs the -u to run python in unbuffered mode
                     autostart: true,
                     test_server: Some(false)
                 },
@@ -74,16 +72,16 @@ impl App {
                     name: "Timer 3 (custom)".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "14".to_string() , "custom python message".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "14".to_string() , "\"custom python message \"".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
                     test_server: Some(false)
                 },
                 Server {
                     id: 5,
-                    name: "Timer 4".to_string(),
+                    name: "Timer diff timescale".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "11".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string() , "timer.py".to_string(), "11".to_string() , "\"modified timescale \"".to_string() , "2".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
                     test_server: Some(false)
                 },
@@ -321,6 +319,11 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
         .constraints([Constraint::Percentage(30), Constraint::Percentage(70)].as_ref())
         .split(content_area_chunk); // Split the top part
 
+    let left_split_chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Percentage(70) , Constraint::Percentage(30)].as_ref())
+        .split(content_chunks[0]);
+
     // Left Panel: Server List
     let server_items: Vec<ListItem> = app
         .available_servers
@@ -344,12 +347,16 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
             Block::default()
                 .title("Servers")
                 .borders(Borders::ALL)
-                .border_style(Style::new().light_blue()),
+                .border_style(Style::new().fg(Color::Indexed(33))),
         )
         .highlight_style(Style::default().add_modifier(Modifier::BOLD))
         .highlight_symbol("> ");
 
-    frame.render_widget(server_list, content_chunks[0]);
+    frame.render_widget(server_list, left_split_chunks[0]);
+
+    // make little image output or animtaion in the small bottom left box
+    let blb = Block::default().bg(Color::Indexed(200)).border_style(Style::new().fg(Color::Indexed(50)));
+    frame.render_widget(blb, left_split_chunks[1]);
 
     // Right Panel: Log Output
     let log_panel_frame_rect = content_chunks[1]; // The Rect for the entire log panel widget (frame included)
@@ -370,8 +377,8 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
             Block::default()
                 .title("Log Stream")
                 .borders(Borders::ALL)
-                .border_style(Style::new().fg(Color::Rgb(255, 165, 0))),
-        ) // orange
+                .border_style(Style::new().fg(Color::Indexed(208))),
+        )
         .wrap(Wrap { trim: true })
         .scroll((scroll_offset_y, 0)); // Add scroll to show the bottom of the logs
     frame.render_widget(right_panel_content, log_panel_frame_rect);
