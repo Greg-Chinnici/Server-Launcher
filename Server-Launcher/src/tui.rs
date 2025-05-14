@@ -6,7 +6,7 @@ use crossterm::{
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*, style::{Modifier, Style}, symbols::scrollbar::VERTICAL, widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
+    prelude::*, style::{Modifier, Style}, widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
 };
 use std::collections::{vec_deque, HashMap, VecDeque};
 use std::error::Error;
@@ -14,7 +14,7 @@ use std::io;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-use crate::servers::{self, ServerLifecycleEvent};
+use crate::servers::{self, ServerLifecycleEvent, ServerMessage};
 use crate::{db::Server, servers::ServerHandle};
 
 struct App {
@@ -25,8 +25,8 @@ struct App {
     selected_server: usize,
     allocated_servers: HashMap<String, ServerHandle>,
     // direct log data
-    log_sender: Sender<String>,
-    log_receiver: Receiver<String>,
+    log_sender: Sender<ServerMessage>,
+    log_receiver: Receiver<ServerMessage>,
     // server open / close
     server_event_sender: Sender<ServerLifecycleEvent>,
     server_event_receiver: Receiver<ServerLifecycleEvent>,
@@ -273,7 +273,9 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
         }
 
         while let Ok(log_message) = app.log_receiver.try_recv() {
-            app.logs.push_back(log_message);
+            app.logs.push_back(format!("[{}] {}",log_message.name,log_message.contents));
+            //[todo!("Foramtting the output when the message is passed baed on the server name")];
+            //let _ = Line::from(Span::from(log_message.contents));
         }
 
         while let Ok(event) = app.server_event_receiver.try_recv() {
@@ -336,7 +338,7 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
                 } else {
                     format!("{}", server.name)
                 },
-                style_builder(i, server.clone(), app),
+                server_list_style_builder(i, server.clone(), app),
             ));
             ListItem::new(line)
         })
@@ -410,7 +412,7 @@ fn wrap_index(index: usize, max_index: usize, delta: isize) -> usize {
     result_signed as usize
 }
 
-fn style_builder(index: usize, server: Server, app: &App) -> Style {
+fn server_list_style_builder(index: usize, server: Server, app: &App) -> Style {
     let mut style = Style::new();
 
     if app.allocated_servers.contains_key(&server.name) {
@@ -428,4 +430,8 @@ fn style_builder(index: usize, server: Server, app: &App) -> Style {
     }
 
     style
+}
+
+fn output_log_style_builder(message: ServerMessage) -> Style{
+    Style::new()
 }

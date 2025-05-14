@@ -1,4 +1,4 @@
-use std::io;
+use std::io::{self, Stdin};
 use std::io::{BufRead, BufReader, Result, Read};
 use std::process::{Child, Command, Stdio};
 use std::sync::mpsc::Sender;
@@ -15,9 +15,16 @@ pub enum ServerLifecycleEvent {
 pub struct ServerHandle {
     pub child: Option<Child>,
     pub name: String,
-    pub log_sender: Sender<String>, // Renamed for clarity
+    pub log_sender: Sender<ServerMessage>, // Renamed for clarity
     pub server_event_sender: Sender<ServerLifecycleEvent>,
+//    pub input: Stdin,
     pub running: bool,
+}
+
+pub struct ServerMessage{
+    pub name: String,
+    pub contents: String,
+    pub is_err: bool,
 }
 
 impl ServerHandle {
@@ -82,7 +89,7 @@ fn capture_output<R: Read + Send + 'static>(
     reader: R,
     name: String,
     is_stderr: bool,
-    sender: Sender<String>,
+    sender: Sender<ServerMessage>,
     event_sender: Sender<ServerLifecycleEvent>,
 ) {
     thread::spawn(move || {
@@ -91,8 +98,8 @@ fn capture_output<R: Read + Send + 'static>(
             match line {
                 Ok(line_content) => {
                     let prefix = if is_stderr { "[stderr] " } else { "" };
-                    let msg = format!("[{}] {}{}", name, prefix, line_content);
-                    if let Err(e) = sender.send(msg) {
+                    let msg = format!("{}{}", prefix, line_content);
+                    if let Err(e) = sender.send(ServerMessage{name:name.clone(),  contents: msg , is_err: true}) {
                         eprintln!("[{}] Error sending log: {}", name, e);
                     }
                 }
@@ -113,7 +120,7 @@ fn capture_output<R: Read + Send + 'static>(
 
 pub fn launch(
     server: &Server,
-    log_sender: Sender<String>,
+    log_sender: Sender<ServerMessage>,
     server_event_sender: Sender<ServerLifecycleEvent>,
 ) -> Result<ServerHandle> {
     if server.test_server == Some(true) {
@@ -164,7 +171,7 @@ pub fn launch(
 // Dummy launch function updated to use the event sender
 fn dummy_launch(
     server: &Server,
-    log_sender: Sender<String>,
+    log_sender: Sender<ServerMessage>,
     server_event_sender: Sender<ServerLifecycleEvent>,
 ) -> Result<ServerHandle> {
     let name = server.name.clone();
@@ -173,9 +180,9 @@ fn dummy_launch(
     thread::spawn(move || {
         for i in 0..15 {
             if let Err(e) =
-                log_sender_clone.send(format!("[{}] Dummy server running... {}", name, i))
+                log_sender_clone.send(ServerMessage{contents: format!("Dummy server running... {}", i), name: name.clone() , is_err: false})
             {
-                eprintln!("[{}] Error sending dummy log: {}", name, e);
+                eprintln!("[{}] Error sending dummy log: {}", name.clone(), e);
             }
             thread::sleep(std::time::Duration::from_secs(1));
         }
