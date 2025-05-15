@@ -1,12 +1,12 @@
 use crossterm::{
-    event::{
-        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind,
-    },
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    prelude::*, style::{Modifier, Style}, widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap}
+    prelude::*,
+    style::{Modifier, Style},
+    widgets::{Block, BorderType, Borders, List, ListItem, Paragraph, Wrap},
 };
 use std::collections::{vec_deque, HashMap, VecDeque};
 use std::error::Error;
@@ -14,13 +14,13 @@ use std::io;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::time::Duration;
 
-use crate::servers::{self, ServerLifecycleEvent, ServerMessage};
+use crate::servers::{self, MessageType, ServerLifecycleEvent, ServerMessage};
 use crate::{db::Server, servers::ServerHandle};
 
 struct App {
     counter: i32,
     // Placeholder for server logs
-    logs: VecDeque<String>,
+    logs: VecDeque<ServerMessage>,
     available_servers: Vec<Server>,
     selected_server: usize,
     allocated_servers: HashMap<String, ServerHandle>,
@@ -38,7 +38,7 @@ impl App {
         let (server_event_sender, server_event_receiver) = channel();
         App {
             counter: 0,
-            logs: VecDeque::from(["Log panel initialized.".to_string()]),
+            logs: VecDeque::from(vec![ServerMessage{name: "".to_string() ,contents: "Log Panel Initialized".to_string() , message_type: MessageType::None}]),
             available_servers: vec![
                 Server {
                     id: 1,
@@ -47,43 +47,54 @@ impl App {
                     executable: "server.jar".to_string(),
                     args: vec!["arg1".to_string(), "arg2".to_string()],
                     autostart: false,
-                    test_server: Some(true)
+                    test_server: Some(true),
                 },
                 Server {
                     id: 2,
                     name: "Timer 1".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string(), "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
-                    test_server: Some(false)
+                    test_server: Some(false),
                 },
                 Server {
                     id: 3,
                     name: "Ascii Image".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "ascii_image.py".to_string(),], // needs the -u to run python in unbuffered mode
+                    args: vec!["-u".to_string(), "ascii_image.py".to_string()], // needs the -u to run python in unbuffered mode
                     autostart: true,
-                    test_server: Some(false)
+                    test_server: Some(false),
                 },
                 Server {
                     id: 4,
                     name: "Timer 3 (custom)".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "14".to_string() , "\"custom python message \"".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec![
+                        "-u".to_string(),
+                        "timer.py".to_string(),
+                        "14".to_string(),
+                        "\"custom python message \"".to_string(),
+                    ], // needs the -u to run python in unbuffered mode
                     autostart: true,
-                    test_server: Some(false)
+                    test_server: Some(false),
                 },
                 Server {
                     id: 5,
                     name: "Timer diff timescale".to_string(),
                     path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
                     executable: "python3".to_string(),
-                    args: vec!["-u".to_string() , "timer.py".to_string(), "11".to_string() , "\"modified timescale \"".to_string() , "2".to_string()], // needs the -u to run python in unbuffered mode
+                    args: vec![
+                        "-u".to_string(),
+                        "timer.py".to_string(),
+                        "11".to_string(),
+                        "\"modified timescale \"".to_string(),
+                        "2".to_string(),
+                    ], // needs the -u to run python in unbuffered mode
                     autostart: true,
-                    test_server: Some(false)
+                    test_server: Some(false),
                 },
                 Server {
                     id: 6,
@@ -92,8 +103,7 @@ impl App {
                     executable: "./start_Server.sh".to_string(),
                     args: vec![],
                     autostart: false,
-                    test_server: Some(false)
-
+                    test_server: Some(false),
                 },
             ],
             selected_server: 0,
@@ -117,16 +127,20 @@ impl App {
                     match child.try_wait() {
                         Ok(Some(_status)) => {
                             // Process has exited
-                            self.logs
-                                .push_back(format!("Server {} process has exited.", name));
+                            self.logs.push_back(ServerMessage {
+                                name: "".to_string(),
+                                contents: format!("Server {} process has exited.", name),
+                                message_type: MessageType::Main }
+                            );
                             handle.running = false; // Mark as not running
                         }
                         Ok(None) => { /* Process is still running */ }
                         Err(e) => {
-                            self.logs.push_back(format!(
-                                "Error checking status for server {}: {}. Marking as not running.",
-                                name, e
-                            ));
+                            self.logs.push_back(ServerMessage {
+                                name: "".to_string(),
+                                contents: format!("Error checking status for server {}: {}. Marking as not running.",name, e),
+                                message_type: MessageType::Err }
+                            );
                             handle.running = false; // Mark as not running on error
                         }
                     }
@@ -178,7 +192,6 @@ pub fn init_tui() -> Result<(), Box<dyn Error>> {
 }
 
 fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) -> io::Result<()> {
-
     loop {
         let mut log_panel_frame_rect = Rect::default(); // To store the log panel's frame Rect
 
@@ -221,16 +234,25 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
                                         app.available_servers[app.selected_server].name.clone(),
                                         handle,
                                     );
-                                    app.logs.push_back(format!(
-                                        "Server {} launched successfully.",
-                                        app.available_servers[app.selected_server].name
-                                    ));
+
+                                    app.logs.push_back(ServerMessage {
+                                        name: "".to_string(),
+                                        contents: format!(
+                                            "Server {} launched successfully.",
+                                            app.available_servers[app.selected_server].name
+                                        ),
+                                        message_type: MessageType::Main }
+                                    );
                                 }
                                 Err(e) => {
-                                    app.logs.push_back(format!(
-                                        "Failed to launch server {}: {}",
-                                        app.available_servers[app.selected_server].name, e
-                                    ));
+                                    app.logs.push_back(ServerMessage {
+                                        name: "".to_string(),
+                                        contents: format!(
+                                            "Failed to launch server {}: {}",
+                                            app.available_servers[app.selected_server].name, e
+                                        ),
+                                        message_type: MessageType::Err }
+                                    );
                                 }
                             }
                         }
@@ -243,20 +265,33 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
                                 {
                                     match handle.kill_process() {
                                         Ok(_) => {
-                                            app.logs.push_back(format!("Attempting to kill server: {}. It will be removed from the list if successful.", server_name_to_kill));
+                                            app.logs.push_back(ServerMessage {
+                                                name: "".to_string(),
+                                                contents: format!("Attempting to kill server: {}. It will be removed from the list if successful.", server_name_to_kill),
+                                                message_type: MessageType::Main }
+                                            );
                                         }
                                         Err(e) => {
-                                            app.logs.push_back(format!(
-                                                "Failed to kill server {}: {}",
-                                                server_name_to_kill, e
-                                            ));
+
+                                            app.logs.push_back(ServerMessage {
+                                                name: "".to_string(),
+                                                contents: format!(
+                                                    "Failed to kill server {}: {}",
+                                                    server_name_to_kill, e
+                                                ),
+                                                message_type: MessageType::Err }
+                                            );
                                         }
                                     }
                                 } else {
-                                    app.logs.push_back(format!(
-                                        "Server {} is not currently running or allocated.",
-                                        server_name_to_kill
-                                    ));
+                                    app.logs.push_back(
+                                        ServerMessage{
+                                            name: "".to_string(),
+                                            contents: format!(
+                                            "Server {} is not currently running or allocated.",
+                                            server_name_to_kill),
+                                            message_type: MessageType::Err
+                                        });
                                 }
                             }
                         }
@@ -264,7 +299,13 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
                             app.logs.clear();
                         }
                         KeyCode::Char(' ') => {
-                            app.logs.push_back(format!("Pressed Space, should open popup"));
+                            app.logs
+                                .push_back(
+                                    ServerMessage{
+                                    name: "".to_string(),
+                                    contents: format!("Pressed Space should open popup"),
+                                    message_type: MessageType::Err
+                                });
                         }
                         _ => {}
                     }
@@ -273,15 +314,21 @@ fn run_app<backend: Backend>(terminal: &mut Terminal<backend>, app: &mut App) ->
         }
 
         while let Ok(log_message) = app.log_receiver.try_recv() {
-            app.logs.push_back(format!("[{}] {}",log_message.name,log_message.contents));
-            //[todo!("Foramtting the output when the message is passed baed on the server name")];
-            //let _ = Line::from(Span::from(log_message.contents));
+            app.logs
+                .push_back(log_message)
+            //let _ = Line::from(Span::from(log_message.contents))::Style;
         }
 
         while let Ok(event) = app.server_event_receiver.try_recv() {
             match event {
                 ServerLifecycleEvent::Exited { name } => {
-                    app.logs.push_back(format!("Server {} has exited.", name));
+                    app.logs.push_back(
+                        ServerMessage{
+                        name: "".to_string(),
+                        contents: format!("Server {} has Exited" , name),
+                        message_type: MessageType::Err
+                    });
+
                     if let Some(handle) = app.allocated_servers.get_mut(&name) {
                         handle.running = false;
                     }
@@ -323,7 +370,7 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
 
     let left_split_chunks = Layout::default()
         .direction(Direction::Vertical)
-        .constraints([Constraint::Percentage(70) , Constraint::Percentage(30)].as_ref())
+        .constraints([Constraint::Percentage(70), Constraint::Percentage(30)].as_ref())
         .split(content_chunks[0]);
 
     // Left Panel: Server List
@@ -357,7 +404,9 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
     frame.render_widget(server_list, left_split_chunks[0]);
 
     // make little image output or animtaion in the small bottom left box
-    let blb = Block::default().bg(Color::Indexed(200)).border_style(Style::new().fg(Color::Indexed(50)));
+    let blb = Block::default()
+        .bg(Color::Indexed(200))
+        .border_style(Style::new().fg(Color::Indexed(50)));
     frame.render_widget(blb, left_split_chunks[1]);
 
     // Right Panel: Log Output
@@ -366,7 +415,7 @@ fn ui<backend: Backend>(frame: &mut Frame, app: &App) -> Rect {
     let log_text: Vec<Line> = app
         .logs
         .iter()
-        .map(|log| Line::from(log.as_str()))
+        .map(|log| -> Line {output_log_style_builder(log)})
         .collect();
 
     // Calculate the inner height of the log panel for scrolling content (area inside borders)
@@ -432,6 +481,27 @@ fn server_list_style_builder(index: usize, server: Server, app: &App) -> Style {
     style
 }
 
-fn output_log_style_builder(message: ServerMessage) -> Style{
-    Style::new()
+fn output_log_style_builder(message: &ServerMessage) -> Line {
+    let mut style: Style = Style::new();
+    match message.message_type {
+        MessageType::Err => {
+            style = style.fg(Color::Red).add_modifier(Modifier::BOLD);
+            return Line::from(vec![
+                Span::from(message.name.as_str()).style(style),
+                Span::from(message.contents.as_str()).style(style),
+            ]);
+        }
+        MessageType::None => {
+            style = style.fg(Color::Cyan); // make a server attrbute for this, prob in rgb
+            return Line::from(vec![
+                Span::from(format!("[{}] " , message.name.as_str())).style(style),
+                Span::from(message.contents.as_str()).style(style),
+            ]);
+        }
+        _ => {
+            style = style;
+        }
+    }
+
+    Line::from(Span::from(message.contents.as_str()))
 }

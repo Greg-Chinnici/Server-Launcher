@@ -24,7 +24,10 @@ pub struct ServerHandle {
 pub struct ServerMessage{
     pub name: String,
     pub contents: String,
-    pub is_err: bool,
+    pub message_type: MessageType,
+}
+pub enum MessageType{
+    Err , Main , None
 }
 
 impl ServerHandle {
@@ -98,8 +101,8 @@ fn capture_output<R: Read + Send + 'static>(
             match line {
                 Ok(line_content) => {
                     let prefix = if is_stderr { "[stderr] " } else { "" };
-                    let msg = format!("{}{}", prefix, line_content);
-                    if let Err(e) = sender.send(ServerMessage{name:name.clone(),  contents: msg , is_err: true}) {
+                    let msg = format!(" {}{}", prefix, line_content);
+                    if let Err(e) = sender.send(ServerMessage{name:name.clone(),  contents: msg , message_type: MessageType::None}) {
                         eprintln!("[{}] Error sending log: {}", name, e);
                     }
                 }
@@ -180,7 +183,7 @@ fn dummy_launch(
     thread::spawn(move || {
         for i in 0..15 {
             if let Err(e) =
-                log_sender_clone.send(ServerMessage{contents: format!("Dummy server running... {}", i), name: name.clone() , is_err: false})
+                log_sender_clone.send(ServerMessage{contents: format!("Dummy server running... {}", i), name: name.clone() , message_type: MessageType::None})
             {
                 eprintln!("[{}] Error sending dummy log: {}", name.clone(), e);
             }
