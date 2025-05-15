@@ -5,12 +5,12 @@ use rusqlite::{params, Connection, Result};
 #[derive(Debug, Clone)]
 pub struct Server {
     pub id: i32,
-    pub name: String,
-    pub path: String,
-    pub executable: String,
+    pub name: String, // Alias shown in the menu
+    pub path: String, // Absoltute path to the items directory on disk
+    pub executable: String, // Shell env. (python3, sh ...etc)
     pub args: Vec<String>,
-    pub autostart: bool,
-    pub test_server: Option<bool>,
+    pub autostart: bool, // If True will laucnh the server when the program starts
+    pub test_server: Option<bool>, // If true it uses a Dummy Server Thread
     pub display_color: ratatui::style::Color
 }
 
