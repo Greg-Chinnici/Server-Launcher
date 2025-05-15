@@ -11,6 +11,14 @@ pub struct Server {
     pub args: Vec<String>,
     pub autostart: bool,
     pub test_server: Option<bool>,
+    pub display_color: ratatui::style::Color
+}
+
+impl Server {
+    fn default() -> Server {
+        Server { id: -1, name: "".to_string(), path: "~/Users/student/bin".to_string(), executable: "script.sh".to_string(), args: vec!["".to_string()], autostart: false, test_server: Some(false), display_color: Color::White }
+    }
+
 }
 
 pub fn connect_db(path: &str) -> Result<Connection> {
@@ -46,7 +54,8 @@ pub fn load_servers(conn: &Connection) -> Result<Vec<Server>> {
                 .map(String::from)
                 .collect(),
             autostart: row.get::<_, i32>(5)? != 0,
-            test_server: row.get::<_, Option<bool>>(6)?
+            test_server: row.get::<_, Option<bool>>(6)?,
+            display_color: row.get::<ratatui::style::Color>(7)
         })
     })?;
 
