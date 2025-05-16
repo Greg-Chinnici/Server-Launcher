@@ -40,71 +40,10 @@ impl App {
             counter: 0,
             logs: VecDeque::from(vec![ServerMessage{name: "".to_string() ,contents: "Log Panel Initialized".to_string() , message_type: MessageType::None}]),
             available_servers: vec![
-                Server {
-                    id: 1,
-                    name: "Server 1".to_string(),
-                    path: "/C".to_string(),
-                    executable: "server.jar".to_string(),
-                    args: vec!["arg1".to_string(), "arg2".to_string()],
-                    autostart: false,
-                    test_server: Some(true),
-                },
-                Server {
-                    id: 2,
-                    name: "Timer 1".to_string(),
-                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
-                    executable: "python3".to_string(),
-                    args: vec!["-u".to_string(), "timer.py".to_string(), "8".to_string()], // needs the -u to run python in unbuffered mode
-                    autostart: true,
-                    test_server: Some(false),
-                },
-                Server {
-                    id: 3,
-                    name: "Ascii Image".to_string(),
-                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
-                    executable: "python3".to_string(),
-                    args: vec!["-u".to_string(), "ascii_image.py".to_string()], // needs the -u to run python in unbuffered mode
-                    autostart: true,
-                    test_server: Some(false),
-                },
-                Server {
-                    id: 4,
-                    name: "Timer 3 (custom)".to_string(),
-                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
-                    executable: "python3".to_string(),
-                    args: vec![
-                        "-u".to_string(),
-                        "timer.py".to_string(),
-                        "14".to_string(),
-                        "\"custom python message \"".to_string(),
-                    ], // needs the -u to run python in unbuffered mode
-                    autostart: true,
-                    test_server: Some(false),
-                },
-                Server {
-                    id: 5,
-                    name: "Timer diff timescale".to_string(),
-                    path: "/Users/student/Projects/Server-Launcher/Server-Launcher/".to_string(),
-                    executable: "python3".to_string(),
-                    args: vec![
-                        "-u".to_string(),
-                        "timer.py".to_string(),
-                        "11".to_string(),
-                        "\"modified timescale \"".to_string(),
-                        "2".to_string(),
-                    ], // needs the -u to run python in unbuffered mode
-                    autostart: true,
-                    test_server: Some(false),
-                },
-                Server {
-                    id: 6,
-                    name: "Minecraft Server".to_string(),
-                    path: "/Users/student/Downloads/MinecraftServer".to_string(),
-                    executable: "./start_Server.sh".to_string(),
-                    args: vec![],
-                    autostart: false,
-                    test_server: Some(false),
-                },
+                Server::default().id(1).name("Server 1").path("/C").executable("server.jar").test_server(true).display_color(Color::Rgb(30, 230, 180)),
+                Server::default().id(2).name("Timer 1").path("/Users/student/Projects/Server-Launcher/Server-Launcher/").executable("python3").args(vec!["-u".to_string(), "timer.py".to_string(), "8".to_string()]),
+                Server::default().id(3).name("Ascii Image").path("/Users/student/Projects/Server-Launcher/Server-Launcher/").executable("python3").args(vec!["-u".to_string(), "ascii_image.py".to_string()]).autostart(true),
+                Server::default().id(6).name("Minecraft Server").path("/Users/student/Downloads/MinecraftServer").executable("./start_Server.sh")
             ],
             selected_server: 0,
             allocated_servers: HashMap::new(),
@@ -492,7 +431,7 @@ fn output_log_style_builder(message: &ServerMessage) -> Line {
             ]);
         }
         MessageType::None => {
-            style = style.fg(Color::Cyan); // make a server attrbute for this, prob in rgb
+            style = Style::blue(style); // make a server attrbute for this, prob in rgb
             return Line::from(vec![
                 Span::from(format!("[{}] " , message.name.as_str())).style(style),
                 Span::from(message.contents.as_str()).style(style),

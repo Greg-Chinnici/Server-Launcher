@@ -126,7 +126,7 @@ pub fn launch(
     log_sender: Sender<ServerMessage>,
     server_event_sender: Sender<ServerLifecycleEvent>,
 ) -> Result<ServerHandle> {
-    if server.test_server == Some(true) {
+    if server.test_server {
         return dummy_launch(server, log_sender, server_event_sender);
     }
 

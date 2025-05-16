@@ -1,3 +1,4 @@
+use colored_text::Colorize;
 use ratatui::style::Color;
 use rusqlite::{params, Connection, Result};
 
@@ -10,15 +11,46 @@ pub struct Server {
     pub executable: String, // Shell env. (python3, sh ...etc)
     pub args: Vec<String>,
     pub autostart: bool, // If True will laucnh the server when the program starts
-    pub test_server: Option<bool>, // If true it uses a Dummy Server Thread
-    pub display_color: ratatui::style::Color
+    pub test_server: bool, // If true it uses a Dummy Server Thread
+    pub display_color: ratatui::style::Color // Try to store this in the db as a bitshifted u24 to u32. then decode to use rgb on read
 }
 
 impl Server {
-    fn default() -> Server {
-        Server { id: -1, name: "".to_string(), path: "~/Users/student/bin".to_string(), executable: "script.sh".to_string(), args: vec!["".to_string()], autostart: false, test_server: Some(false), display_color: Color::White }
+    pub fn default() -> Server {
+        Server { id: -1, name: "".to_string(), path: "~/Users/student/bin".to_string(), executable: "script.sh".to_string(), args: vec![], autostart: false, test_server: false, display_color: Color::White }
     }
-
+    pub fn id(mut self , new_id:i32)->Server{
+        self.id = new_id;
+        self
+    }
+    pub fn name(mut self , new_name:&str)->Server{
+        self.name = new_name.to_string();
+        self
+    }
+    pub fn path(mut self ,new_path:&str)->Server{
+        self.path = new_path.to_string();
+        self
+    }
+    pub fn executable(mut self , new_exe:&str)->Server{
+        self.executable = new_exe.to_string();
+        self
+    }
+    pub fn args(mut self , new_args: Vec<String>)->Server{
+        self.args = new_args;
+        self
+    }
+    pub fn autostart(mut self , new_start:bool)->Server{
+        self.autostart = new_start;
+        self
+    }
+    pub fn test_server(mut self , new_test_server:bool)->Server{
+        self.test_server = new_test_server;
+        self
+    }
+    pub fn display_color(mut self , new_color:ratatui::style::Color)->Server{
+        self.display_color = new_color;
+        self
+    }
 }
 
 pub fn connect_db(path: &str) -> Result<Connection> {
@@ -54,8 +86,8 @@ pub fn load_servers(conn: &Connection) -> Result<Vec<Server>> {
                 .map(String::from)
                 .collect(),
             autostart: row.get::<_, i32>(5)? != 0,
-            test_server: row.get::<_, Option<bool>>(6)?,
-            display_color: row.get::<ratatui::style::Color>(7)
+            test_server: row.get::<_, bool>(6)?,
+            display_color: Color::White, //TODO convert the u32 into 3 bytes of rgb
         })
     })?;
 
